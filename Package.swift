@@ -1,4 +1,4 @@
-// swift-tools-version:5.9
+// swift-tools-version: 5.9
 import PackageDescription
 
 let package = Package(
@@ -7,25 +7,12 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(
-            name: "ClipboardHistoryApp",
-            targets: ["ClipboardHistoryApp"]
-        )
-    ],
-    dependencies: [
-        .package(url: "https://github.com/soffes/HotKey.git", from: "0.1.0")
+        .executable(name: "ClipboardHistoryApp", targets: ["ClipboardHistoryApp"])
     ],
     targets: [
         .executableTarget(
             name: "ClipboardHistoryApp",
-            dependencies: ["HotKey"],
-            path: "ClipboardHistoryApp/Sources",
-            exclude: ["Resources/generate_icon.swift"]
-        ),
-        .testTarget(
-            name: "ClipboardHistoryAppTests",
-            dependencies: ["ClipboardHistoryApp"],
-            path: "ClipboardHistoryApp/Tests"
+            dependencies: []
         )
     ]
 ) 
