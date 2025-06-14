@@ -79,6 +79,17 @@ class ClipboardManager {
         delegate?.clipboardDidChange()
     }
     
+    func copySelectedItem(_ content: String) {
+        guard !content.isEmpty else { return }
+        
+        pasteboard.clearContents()
+        pasteboard.setString(content, forType: .string)
+        lastClipboardContent = content
+        
+        // DON'T add to history - this is a recall from existing history
+        // Just update the last clipboard content to prevent duplicate detection
+    }
+    
     func clearHistory() {
         clipboardHistory.removeAll()
     }

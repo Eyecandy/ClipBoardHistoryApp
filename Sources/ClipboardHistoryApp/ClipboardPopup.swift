@@ -11,23 +11,19 @@ class ClipboardItemView: NSView {
     weak var popup: ClipboardPopup?
     
     override func mouseEntered(with event: NSEvent) {
-        print("Mouse entered item \(index)")
         wantsLayer = true
         layer?.backgroundColor = NSColor.selectedControlColor.withAlphaComponent(0.3).cgColor
     }
     
     override func mouseExited(with event: NSEvent) {
-        print("Mouse exited item \(index)")
         layer?.backgroundColor = NSColor.clear.cgColor
     }
     
     override func mouseDown(with event: NSEvent) {
-        print("🖱️ Left click detected on item \(index)")
         popup?.itemClicked(at: index)
     }
     
     override func rightMouseDown(with event: NSEvent) {
-        print("🖱️ Right click detected on item \(index)")
         popup?.itemClicked(at: index)
     }
     
@@ -55,22 +51,18 @@ class ClipboardPopup: NSObject {
     private var eventMonitor: Any?
     
     func show(with items: [String]) {
-        print("📱 Showing popup with \(items.count) items")
         hide() // Hide any existing popup
         
         clipboardItems = Array(items.prefix(3)) // Only show top 3 items
         guard !clipboardItems.isEmpty else { 
-            print("❌ No items to show")
             return 
         }
         
         let mouseLocation = NSEvent.mouseLocation
-        print("📍 Mouse location: \(mouseLocation)")
         createWindow(at: mouseLocation)
     }
     
     func hide() {
-        print("🙈 Hiding popup")
         if let eventMonitor = eventMonitor {
             NSEvent.removeMonitor(eventMonitor)
             self.eventMonitor = nil
@@ -80,13 +72,10 @@ class ClipboardPopup: NSObject {
     }
     
     func itemClicked(at index: Int) {
-        print("🎯 Item \(index) clicked!")
         guard index < clipboardItems.count else { 
-            print("❌ Invalid index \(index), only have \(clipboardItems.count) items")
             return 
         }
         let selectedItem = clipboardItems[index]
-        print("✅ Selected: \(selectedItem)")
         delegate?.popupDidSelectItem(selectedItem)
         hide()
     }
@@ -95,8 +84,6 @@ class ClipboardPopup: NSObject {
         let itemHeight: CGFloat = 50 // Make items taller for easier clicking
         let windowWidth: CGFloat = 300
         let windowHeight = CGFloat(clipboardItems.count) * itemHeight
-        
-        print("📏 Creating window: width=\(windowWidth), height=\(windowHeight)")
         
         // Position window near cursor but ensure it's on screen
         var windowOrigin = NSPoint(x: location.x + 10, y: location.y - windowHeight - 10)
@@ -118,8 +105,6 @@ class ClipboardPopup: NSObject {
             height: windowHeight
         )
         
-        print("📍 Final window position: \(windowRect)")
-        
         window = NSWindow(
             contentRect: windowRect,
             styleMask: [.borderless],
@@ -128,7 +113,6 @@ class ClipboardPopup: NSObject {
         )
         
         guard let window = window else { 
-            print("❌ Failed to create window")
             return 
         }
         
@@ -154,22 +138,18 @@ class ClipboardPopup: NSObject {
                 )
             )
             contentView.addSubview(itemView)
-            print("📝 Added item \(index): \(item)")
         }
         
         // Show window
         window.makeKeyAndOrderFront(nil)
-        print("✅ Window shown")
         
-        // Auto-hide after 10 seconds (increased time for testing)
+        // Auto-hide after 10 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) { [weak self] in
-            print("⏰ Auto-hiding popup after timeout")
             self?.hide()
         }
         
-        // Hide when clicking outside (but not inside the popup)
+        // Hide when clicking outside
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            print("🖱️ Global click detected at \(event.locationInWindow)")
             self?.hide()
         }
     }
@@ -207,15 +187,13 @@ class ClipboardPopup: NSObject {
         containerView.addSubview(label)
         
         // Add click instruction
-        let instructionLabel = NSTextField(labelWithString: "Click to paste")
+        let instructionLabel = NSTextField(labelWithString: "Click to copy")
         instructionLabel.font = NSFont.systemFont(ofSize: 10)
         instructionLabel.textColor = NSColor.secondaryLabelColor
         instructionLabel.frame = NSRect(x: 15, y: 2, width: frame.width - 30, height: 12)
         instructionLabel.backgroundColor = NSColor.clear
         instructionLabel.isBordered = false
         containerView.addSubview(instructionLabel)
-        
-        print("🏗️ Created item view for index \(index) with frame \(frame)")
         
         return containerView
     }
