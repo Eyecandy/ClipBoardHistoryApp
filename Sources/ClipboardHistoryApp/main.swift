@@ -46,10 +46,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             print("2. Add this app to the list")
             print("3. Restart the app")
             
-            // Request permissions
-            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-            let trusted = AXIsProcessTrustedWithOptions(options as CFDictionary)
-            print("🔐 After prompt: \(trusted ? "✅ GRANTED" : "❌ STILL NOT GRANTED")")
+            // Show immediate alert about permissions
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                self.showAccessibilityPermissionAlert()
+            }
+        }
+    }
+    
+    private func showAccessibilityPermissionAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Accessibility Permission Required"
+        alert.informativeText = """
+        ClipboardHistoryApp needs accessibility permission to paste text automatically.
+        
+        Without this permission:
+        • The hotkey (⌘⇧V) will show clipboard items
+        • You'll hear a system beep when trying to paste
+        • You'll need to paste manually (⌘V)
+        
+        Grant permission now?
+        """
+        alert.addButton(withTitle: "Open Settings & Grant Permission")
+        alert.addButton(withTitle: "Continue Without Auto-Paste")
+        alert.alertStyle = .informational
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            self.requestAccessibilityPermissions()
+        }
+    }
+    
+    private func requestAccessibilityPermissions() {
+        // This will show the system permission dialog
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        let trusted = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        print("🔐 After system prompt: \(trusted ? "✅ GRANTED" : "❌ STILL NOT GRANTED")")
+        
+        // Also open system settings as backup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.openAccessibilitySettings()
         }
     }
     
@@ -182,13 +217,45 @@ extension AppDelegate: ClipboardManagerDelegate {
 extension AppDelegate: HotkeyManagerDelegate {
     func hotkeyPressed() {
         print("Hotkey pressed!")
+        
+        // Check if we have accessibility permissions
+        let trusted = AXIsProcessTrusted()
+        
         DispatchQueue.main.async { [weak self] in
             guard let history = self?.clipboardManager?.getHistory() else { 
                 print("No history available")
                 return 
             }
+            
+            if !trusted {
+                print("⚠️  Hotkey used without accessibility permissions - showing warning")
+                self?.showHotkeyPermissionWarning()
+                return
+            }
+            
             print("Showing popup with \(history.count) items")
             self?.clipboardPopup?.show(with: history)
+        }
+    }
+    
+    private func showHotkeyPermissionWarning() {
+        let alert = NSAlert()
+        alert.messageText = "Accessibility Permission Needed"
+        alert.informativeText = """
+        The hotkey (⌘⇧V) requires accessibility permission to paste automatically.
+        
+        You can:
+        • Grant permission now for auto-paste functionality
+        • Use the menu bar icon to access clipboard history
+        • Copy items manually with ⌘C then ⌘V
+        """
+        alert.addButton(withTitle: "Grant Permission Now")
+        alert.addButton(withTitle: "Use Menu Instead")
+        alert.alertStyle = .warning
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            self.requestAccessibilityPermissions()
         }
     }
 }
