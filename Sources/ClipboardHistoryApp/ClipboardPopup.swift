@@ -3,6 +3,8 @@ import AppKit
 
 protocol ClipboardPopupDelegate: AnyObject {
     func popupDidSelectItem(_ item: String)
+    func popupDidRequestFullView(_ item: String)
+    func popupDidRequestDelete(_ item: String)
 }
 
 // Custom view class to handle mouse events and store index
@@ -20,11 +22,17 @@ class ClipboardItemView: NSView {
     }
     
     override func mouseDown(with event: NSEvent) {
-        popup?.itemClicked(at: index)
+        if event.clickCount == 2 {
+            // Double-click to view full text
+            popup?.itemDoubleClicked(at: index)
+        } else {
+            // Single click to copy
+            popup?.itemClicked(at: index)
+        }
     }
     
     override func rightMouseDown(with event: NSEvent) {
-        popup?.itemClicked(at: index)
+        popup?.itemRightClicked(at: index, event: event)
     }
     
     override func updateTrackingAreas() {
@@ -78,6 +86,67 @@ class ClipboardPopup: NSObject {
         let selectedItem = clipboardItems[index]
         delegate?.popupDidSelectItem(selectedItem)
         hide()
+    }
+    
+    func itemDoubleClicked(at index: Int) {
+        guard index < clipboardItems.count else { 
+            return 
+        }
+        let selectedItem = clipboardItems[index]
+        delegate?.popupDidRequestFullView(selectedItem)
+        hide()
+    }
+    
+    func itemRightClicked(at index: Int, event: NSEvent) {
+        guard index < clipboardItems.count else { 
+            return 
+        }
+        let selectedItem = clipboardItems[index]
+        showContextMenu(for: selectedItem, at: index, event: event)
+    }
+    
+    private func showContextMenu(for item: String, at index: Int, event: NSEvent) {
+        let menu = NSMenu()
+        
+        let copyItem = NSMenuItem(title: "Copy", action: #selector(contextMenuCopy), keyEquivalent: "")
+        copyItem.representedObject = item
+        copyItem.target = self
+        menu.addItem(copyItem)
+        
+        let viewFullItem = NSMenuItem(title: "View Full Text", action: #selector(contextMenuViewFull), keyEquivalent: "")
+        viewFullItem.representedObject = item
+        viewFullItem.target = self
+        menu.addItem(viewFullItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let deleteItem = NSMenuItem(title: "Delete", action: #selector(contextMenuDelete), keyEquivalent: "")
+        deleteItem.representedObject = item
+        deleteItem.target = self
+        menu.addItem(deleteItem)
+        
+        NSMenu.popUpContextMenu(menu, with: event, for: window?.contentView ?? NSView())
+    }
+    
+    @objc private func contextMenuCopy(_ sender: NSMenuItem) {
+        if let item = sender.representedObject as? String {
+            delegate?.popupDidSelectItem(item)
+            hide()
+        }
+    }
+    
+    @objc private func contextMenuViewFull(_ sender: NSMenuItem) {
+        if let item = sender.representedObject as? String {
+            delegate?.popupDidRequestFullView(item)
+            hide()
+        }
+    }
+    
+    @objc private func contextMenuDelete(_ sender: NSMenuItem) {
+        if let item = sender.representedObject as? String {
+            delegate?.popupDidRequestDelete(item)
+            hide()
+        }
     }
     
     private func createWindow(at location: NSPoint) {
@@ -173,8 +242,8 @@ class ClipboardPopup: NSObject {
         containerView.layer?.borderColor = NSColor.separatorColor.cgColor
         containerView.layer?.borderWidth = 0.5
         
-        // Truncate long text
-        let displayText = item.truncated(to: 50)
+        // Clean up text for display - replace newlines with spaces and truncate
+        let displayText = item.cleanedForDisplay().truncated(to: 50)
         
         // Create label
         let label = NSTextField(labelWithString: displayText)
@@ -187,8 +256,8 @@ class ClipboardPopup: NSObject {
         containerView.addSubview(label)
         
         // Add click instruction
-        let instructionLabel = NSTextField(labelWithString: "Click to copy")
-        instructionLabel.font = NSFont.systemFont(ofSize: 10)
+        let instructionLabel = NSTextField(labelWithString: "Click: copy • Double-click: view full • Right-click: options")
+        instructionLabel.font = NSFont.systemFont(ofSize: 9)
         instructionLabel.textColor = NSColor.secondaryLabelColor
         instructionLabel.frame = NSRect(x: 15, y: 2, width: frame.width - 30, height: 12)
         instructionLabel.backgroundColor = NSColor.clear

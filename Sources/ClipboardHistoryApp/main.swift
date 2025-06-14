@@ -83,10 +83,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(emptyItem)
         } else {
             for (index, item) in history.enumerated() {
-                let menuTitle = item.truncated(to: 50)
+                // Clean up multi-line text for menu display
+                let menuTitle = item.cleanedForDisplay().truncated(to: 50)
                 let menuItem = NSMenuItem(title: menuTitle, action: #selector(selectClipboardItem(_:)), keyEquivalent: "")
                 menuItem.tag = index
                 menuItem.target = self
+                
+                // Add submenu for each item with options
+                let submenu = NSMenu()
+                
+                let copyAction = NSMenuItem(title: "Copy", action: #selector(selectClipboardItem(_:)), keyEquivalent: "")
+                copyAction.tag = index
+                copyAction.target = self
+                submenu.addItem(copyAction)
+                
+                let viewFullAction = NSMenuItem(title: "View Full Text", action: #selector(viewFullClipboardItem(_:)), keyEquivalent: "")
+                viewFullAction.tag = index
+                viewFullAction.target = self
+                submenu.addItem(viewFullAction)
+                
+                let deleteAction = NSMenuItem(title: "Delete", action: #selector(deleteClipboardItem(_:)), keyEquivalent: "")
+                deleteAction.tag = index
+                deleteAction.target = self
+                submenu.addItem(deleteAction)
+                
+                menuItem.submenu = submenu
                 menu.addItem(menuItem)
             }
         }
@@ -126,12 +147,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         clipboardManager?.clearHistory()
         updateMenu()
     }
+    
+    @objc func deleteClipboardItem(_ sender: NSMenuItem) {
+        clipboardManager?.deleteItem(at: sender.tag)
+    }
+    
+    @objc func viewFullClipboardItem(_ sender: NSMenuItem) {
+        guard let history = clipboardManager?.getHistory(),
+              sender.tag >= 0,
+              sender.tag < history.count else { 
+            return 
+        }
+        
+        let item = history[sender.tag]
+        showFullTextDialog(for: item)
+    }
+    
+    private func showFullTextDialog(for text: String) {
+        let alert = NSAlert()
+        alert.messageText = "Full Clipboard Content"
+        alert.informativeText = text
+        alert.addButton(withTitle: "Copy")
+        alert.addButton(withTitle: "Close")
+        alert.alertStyle = .informational
+        
+        // Make the alert resizable for long text
+        alert.window.setContentSize(NSSize(width: 500, height: 400))
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            clipboardManager?.copySelectedItem(text)
+        }
+    }
 
     @objc func quit() {
         hotkeyManager?.unregisterHotkey()
         clipboardManager?.stopMonitoring()
         clipboardPopup?.hide()
         NSApplication.shared.terminate(nil)
+    }
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        // Ensure history is saved when app quits
+        clipboardManager?.saveHistoryOnExit()
     }
 }
 
@@ -165,6 +223,18 @@ extension AppDelegate: ClipboardPopupDelegate {
         // Simply copy to clipboard - user can paste manually with ⌘V
         clipboardManager?.copySelectedItem(item)
     }
+    
+    func popupDidRequestFullView(_ item: String) {
+        showFullTextDialog(for: item)
+    }
+    
+    func popupDidRequestDelete(_ item: String) {
+        guard let history = clipboardManager?.getHistory(),
+              let index = history.firstIndex(of: item) else { 
+            return 
+        }
+        clipboardManager?.deleteItem(at: index)
+    }
 }
 
 extension String {
@@ -174,5 +244,12 @@ extension String {
         } else {
             return self
         }
+    }
+    
+    func cleanedForDisplay() -> String {
+        return self.replacingOccurrences(of: "\n", with: " ")
+                   .replacingOccurrences(of: "\r", with: " ")
+                   .replacingOccurrences(of: "\t", with: " ")
+                   .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 } 

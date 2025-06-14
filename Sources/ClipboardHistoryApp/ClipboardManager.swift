@@ -13,8 +13,12 @@ class ClipboardManager {
     private let maxHistorySize = 20
     
     private let pasteboard = NSPasteboard.general
+    private let historyKey = "ClipboardHistory"
     
     func startMonitoring() {
+        // Load saved history from UserDefaults
+        loadHistory()
+        
         // Get initial clipboard content safely
         if let initialContent = getCurrentClipboardContent() {
             lastClipboardContent = initialContent
@@ -58,6 +62,10 @@ class ClipboardManager {
         }
         
         lastClipboardContent = currentContent
+        
+        // Save history to persistent storage
+        saveHistory()
+        
         delegate?.clipboardDidChange()
     }
     
@@ -76,6 +84,9 @@ class ClipboardManager {
         clipboardHistory.removeAll { $0 == content }
         clipboardHistory.insert(content, at: 0)
         
+        // Save updated history
+        saveHistory()
+        
         delegate?.clipboardDidChange()
     }
     
@@ -92,5 +103,37 @@ class ClipboardManager {
     
     func clearHistory() {
         clipboardHistory.removeAll()
+        saveHistory() // Save the empty history
+    }
+    
+    func deleteItem(at index: Int) {
+        guard index >= 0 && index < clipboardHistory.count else { return }
+        clipboardHistory.remove(at: index)
+        saveHistory()
+        delegate?.clipboardDidChange()
+    }
+    
+    // MARK: - Persistence
+    
+    private func saveHistory() {
+        UserDefaults.standard.set(clipboardHistory, forKey: historyKey)
+    }
+    
+    private func loadHistory() {
+        if let savedHistory = UserDefaults.standard.array(forKey: historyKey) as? [String] {
+            clipboardHistory = Array(savedHistory.prefix(maxHistorySize))
+            print("📚 Loaded \(clipboardHistory.count) items from saved history")
+            
+            // Trigger UI update after loading history
+            DispatchQueue.main.async { [weak self] in
+                self?.delegate?.clipboardDidChange()
+            }
+        }
+    }
+    
+    func saveHistoryOnExit() {
+        saveHistory()
+        UserDefaults.standard.synchronize() // Force immediate save
+        print("💾 History saved on app exit")
     }
 } 
