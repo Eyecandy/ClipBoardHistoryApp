@@ -12,12 +12,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var clipboardManager: ClipboardManager?
     var hotkeyManager: HotkeyManager?
     var clipboardPopup: ClipboardPopup?
+    var hasShownPermissionAlert = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("App starting...")
-        
-        // Check accessibility permissions
-        checkAccessibilityPermissions()
         
         // Hide the dock icon
         NSApp.setActivationPolicy(.accessory)
@@ -40,15 +38,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let trusted = AXIsProcessTrusted()
         print("🔐 Accessibility permissions: \(trusted ? "✅ GRANTED" : "❌ NOT GRANTED")")
         
+        // Debug: Print current executable info
+        let executablePath = Bundle.main.executablePath ?? "Unknown"
+        let bundlePath = Bundle.main.bundlePath
+        print("📍 Current executable: \(executablePath)")
+        print("📦 Bundle path: \(bundlePath)")
+        print("🆔 Bundle identifier: \(Bundle.main.bundleIdentifier ?? "None")")
+        
         if !trusted {
             print("⚠️  To enable paste functionality, please:")
             print("1. Open System Settings > Privacy & Security > Accessibility")
-            print("2. Add this app to the list")
-            print("3. Restart the app")
+            print("2. Add this app to the list: \(bundlePath)")
+            print("3. Make sure to toggle it ON")
+            print("4. Restart the app")
             
-            // Show immediate alert about permissions
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                self.showAccessibilityPermissionAlert()
+            // Show immediate alert about permissions (only once)
+            if !hasShownPermissionAlert {
+                hasShownPermissionAlert = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    self.showAccessibilityPermissionAlert()
+                }
             }
         }
     }
@@ -185,6 +194,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let selectedItem = history[sender.tag]
         print("Selected item: \(selectedItem)")
+        
+        // Just copy to clipboard - user can paste manually with ⌘V
+        // No permission prompt needed for menu selections
         clipboardManager?.copyToClipboard(selectedItem)
     }
     
@@ -218,19 +230,10 @@ extension AppDelegate: HotkeyManagerDelegate {
     func hotkeyPressed() {
         print("Hotkey pressed!")
         
-        // Check if we have accessibility permissions
-        let trusted = AXIsProcessTrusted()
-        
         DispatchQueue.main.async { [weak self] in
             guard let history = self?.clipboardManager?.getHistory() else { 
                 print("No history available")
                 return 
-            }
-            
-            if !trusted {
-                print("⚠️  Hotkey used without accessibility permissions - showing warning")
-                self?.showHotkeyPermissionWarning()
-                return
             }
             
             print("Showing popup with \(history.count) items")
@@ -238,20 +241,24 @@ extension AppDelegate: HotkeyManagerDelegate {
         }
     }
     
-    private func showHotkeyPermissionWarning() {
+    private func showPastePermissionAlert() {
         let alert = NSAlert()
-        alert.messageText = "Accessibility Permission Needed"
+        alert.messageText = "Enable Auto-Paste?"
         alert.informativeText = """
-        The hotkey (⌘⇧V) requires accessibility permission to paste automatically.
+        ClipboardHistoryApp can automatically paste the selected text for you.
         
-        You can:
-        • Grant permission now for auto-paste functionality
-        • Use the menu bar icon to access clipboard history
-        • Copy items manually with ⌘C then ⌘V
+        This requires accessibility permission to simulate keyboard shortcuts.
+        
+        Without permission:
+        • Text is copied to clipboard
+        • You manually paste with ⌘V
+        
+        With permission:
+        • Text is automatically pasted where you're typing
         """
-        alert.addButton(withTitle: "Grant Permission Now")
-        alert.addButton(withTitle: "Use Menu Instead")
-        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Grant Permission & Auto-Paste")
+        alert.addButton(withTitle: "Just Copy (Manual Paste)")
+        alert.alertStyle = .informational
         
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
@@ -274,16 +281,11 @@ extension AppDelegate: ClipboardPopupDelegate {
         
         if !trusted {
             print("❌ Cannot paste: Accessibility permissions required")
-            // Show alert or notification
-            DispatchQueue.main.async {
-                let alert = NSAlert()
-                alert.messageText = "Accessibility Permission Required"
-                alert.informativeText = "To enable automatic pasting, please grant accessibility permission in System Settings > Privacy & Security > Accessibility"
-                alert.addButton(withTitle: "Open Settings")
-                alert.addButton(withTitle: "Cancel")
-                
-                if alert.runModal() == .alertFirstButtonReturn {
-                    self.openAccessibilitySettings()
+            // Show permission request dialog only when user tries to paste
+            if !hasShownPermissionAlert {
+                hasShownPermissionAlert = true
+                DispatchQueue.main.async {
+                    self.showPastePermissionAlert()
                 }
             }
             return
@@ -296,101 +298,137 @@ extension AppDelegate: ClipboardPopupDelegate {
     }
     
     private func simulatePasteWithMultipleMethods() {
-        print("🔄 Trying multiple paste methods...")
+        print("🔄 Simulating paste...")
         
-        // Method 1: Standard CGEvent approach
-        simulatePasteMethod1()
-        
-        // Method 2: Alternative event source
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.simulatePasteMethod2()
-        }
-        
-        // Method 3: Using NSApplication
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            self.simulatePasteMethod3()
-        }
-    }
-    
-    private func simulatePasteMethod1() {
-        print("📋 Method 1: Standard CGEvent with session tap")
-        
-        guard let source = CGEventSource(stateID: .combinedSessionState) else { 
-            print("❌ Method 1: Failed to create event source")
-            return 
-        }
-        
-        guard let keyDownEvent = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
-              let keyUpEvent = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false) else { 
-            print("❌ Method 1: Failed to create key events")
-            return 
-        }
-        
-        keyDownEvent.flags = .maskCommand
-        keyUpEvent.flags = .maskCommand
-        
-        print("📤 Method 1: Posting events...")
-        keyDownEvent.post(tap: .cgSessionEventTap)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            keyUpEvent.post(tap: .cgSessionEventTap)
-            print("✅ Method 1: Events posted")
-        }
-    }
-    
-    private func simulatePasteMethod2() {
-        print("📋 Method 2: CGEvent with annotation session")
-        
-        guard let source = CGEventSource(stateID: .hidSystemState) else { 
-            print("❌ Method 2: Failed to create HID event source")
-            return 
-        }
-        
-        guard let keyDownEvent = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
-              let keyUpEvent = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false) else { 
-            print("❌ Method 2: Failed to create key events")
-            return 
-        }
-        
-        keyDownEvent.flags = .maskCommand
-        keyUpEvent.flags = .maskCommand
-        
-        print("📤 Method 2: Posting to annotation session...")
-        keyDownEvent.post(tap: .cghidEventTap)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            keyUpEvent.post(tap: .cghidEventTap)
-            print("✅ Method 2: Events posted")
-        }
-    }
-    
-    private func simulatePasteMethod3() {
-        print("📋 Method 3: Using NSApplication sendEvent")
-        
-        // Get the current frontmost application
+        // Get the frontmost application info (before showing popup)
         let workspace = NSWorkspace.shared
-        if let frontApp = workspace.frontmostApplication {
-            print("🎯 Method 3: Target app: \(frontApp.localizedName ?? "Unknown")")
+        guard let frontApp = workspace.frontmostApplication else {
+            print("❌ No frontmost application found")
+            showPasteError("No target application found. Please click in a text field first.")
+            return
         }
         
-        // Create NSEvent
-        if let event = NSEvent.keyEvent(
-            with: .keyDown,
-            location: NSPoint.zero,
-            modifierFlags: .command,
-            timestamp: 0,
-            windowNumber: 0,
-            context: nil,
-            characters: "v",
-            charactersIgnoringModifiers: "v",
-            isARepeat: false,
-            keyCode: 9
-        ) {
-            print("📤 Method 3: Sending NSEvent...")
-            NSApplication.shared.postEvent(event, atStart: false)
-            print("✅ Method 3: NSEvent posted")
-        } else {
-            print("❌ Method 3: Failed to create NSEvent")
+        print("🎯 Target app: \(frontApp.localizedName ?? "Unknown") (PID: \(frontApp.processIdentifier))")
+        
+        // Check if target app is our own app (which means paste will fail)
+        if frontApp.bundleIdentifier == Bundle.main.bundleIdentifier {
+            showPasteError("No target application selected. Please click in a text field in another app first.")
+            return
+        }
+        
+        // Give time for popup to hide and activate the target app
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            // Activate the target application to ensure it receives the paste
+            let activationResult = frontApp.activate(options: [])
+            print("🔄 App activation result: \(activationResult)")
+            
+            // Small additional delay to ensure activation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // Double-check that the app is still the frontmost
+                if let currentFrontApp = workspace.frontmostApplication {
+                    print("🔍 Current frontmost app after activation: \(currentFrontApp.localizedName ?? "Unknown")")
+                    
+                    if currentFrontApp.bundleIdentifier != frontApp.bundleIdentifier {
+                        self.showPasteError("Failed to activate target application '\(frontApp.localizedName ?? "Unknown")'. Try clicking in the app first.")
+                        return
+                    }
+                }
+                
+                self.simulatePaste()
+            }
+        }
+    }
+    
+    private func simulatePaste() {
+        print("📋 Attempting to simulate Cmd+V paste...")
+        
+        // Try using the combined session state which is more reliable
+        guard let source = CGEventSource(stateID: .combinedSessionState) else { 
+            print("❌ Failed to create event source")
+            showPasteError("Failed to create event source. This might be a system permission issue.")
+            return 
+        }
+        
+        // Create key down and key up events for 'V' key (virtual key code 9)
+        guard let keyDownEvent = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
+              let keyUpEvent = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false) else { 
+            print("❌ Failed to create key events")
+            showPasteError("Failed to create keyboard events. macOS might be blocking event creation.")
+            return 
+        }
+        
+        // Set Command modifier flag
+        keyDownEvent.flags = .maskCommand
+        keyUpEvent.flags = .maskCommand
+        
+        // Post the events using the session event tap
+        print("📤 Posting Cmd+V key down...")
+        keyDownEvent.post(tap: .cgSessionEventTap)
+        print("✅ Key down event posted")
+        
+        // Small delay between key down and key up
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+            print("📤 Posting Cmd+V key up...")
+            keyUpEvent.post(tap: .cgSessionEventTap)
+            print("✅ Key up event posted")
+            
+            // Check if paste actually worked by monitoring clipboard activity
+            self.verifyPasteSuccess()
+        }
+    }
+    
+    private func verifyPasteSuccess() {
+        var hasShownError = false
+        
+        // Wait a moment for the paste to potentially occur
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // We can't directly verify if paste worked, but we can check common failure scenarios
+            let workspace = NSWorkspace.shared
+            if let frontApp = workspace.frontmostApplication {
+                print("🔍 Final frontmost app: \(frontApp.localizedName ?? "Unknown")")
+                
+                // If our app is still frontmost, paste likely failed
+                if frontApp.bundleIdentifier == Bundle.main.bundleIdentifier && !hasShownError {
+                    hasShownError = true
+                    self.showPasteError("Paste may have failed - no target application detected. Try clicking in a text field first.")
+                }
+            }
+        }
+        
+        // Also set up a system event monitor to detect if there's a system beep/error
+        let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.systemDefined]) { event in
+            print("🔍 System event detected: \(event)")
+        }
+        
+        // Remove the monitor after a short time
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            if let monitor = monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+        }
+    }
+    
+    private func showPasteError(_ message: String) {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Paste Failed"
+            alert.informativeText = """
+            \(message)
+            
+            Troubleshooting tips:
+            • Make sure you clicked in a text field before using the hotkey
+            • Try clicking in the target app first, then use ⌘⇧V
+            • Some apps don't accept simulated keyboard input
+            • You can always paste manually with ⌘V after selecting an item
+            """
+            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: "Open Accessibility Settings")
+            alert.alertStyle = .warning
+            
+            let response = alert.runModal()
+            if response == .alertSecondButtonReturn {
+                self.openAccessibilitySettings()
+            }
         }
     }
 }
