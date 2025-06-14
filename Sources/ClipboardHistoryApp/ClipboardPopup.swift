@@ -11,16 +11,24 @@ class ClipboardItemView: NSView {
     weak var popup: ClipboardPopup?
     
     override func mouseEntered(with event: NSEvent) {
+        print("Mouse entered item \(index)")
         wantsLayer = true
         layer?.backgroundColor = NSColor.selectedControlColor.withAlphaComponent(0.3).cgColor
     }
     
     override func mouseExited(with event: NSEvent) {
+        print("Mouse exited item \(index)")
         layer?.backgroundColor = NSColor.clear.cgColor
     }
     
+    override func mouseDown(with event: NSEvent) {
+        print("🖱️ Left click detected on item \(index)")
+        popup?.itemClicked(at: index)
+    }
+    
     override func rightMouseDown(with event: NSEvent) {
-        popup?.itemRightClicked(at: index)
+        print("🖱️ Right click detected on item \(index)")
+        popup?.itemClicked(at: index)
     }
     
     override func updateTrackingAreas() {
@@ -47,16 +55,22 @@ class ClipboardPopup: NSObject {
     private var eventMonitor: Any?
     
     func show(with items: [String]) {
+        print("📱 Showing popup with \(items.count) items")
         hide() // Hide any existing popup
         
         clipboardItems = Array(items.prefix(3)) // Only show top 3 items
-        guard !clipboardItems.isEmpty else { return }
+        guard !clipboardItems.isEmpty else { 
+            print("❌ No items to show")
+            return 
+        }
         
         let mouseLocation = NSEvent.mouseLocation
+        print("📍 Mouse location: \(mouseLocation)")
         createWindow(at: mouseLocation)
     }
     
     func hide() {
+        print("🙈 Hiding popup")
         if let eventMonitor = eventMonitor {
             NSEvent.removeMonitor(eventMonitor)
             self.eventMonitor = nil
@@ -65,17 +79,24 @@ class ClipboardPopup: NSObject {
         window = nil
     }
     
-    func itemRightClicked(at index: Int) {
-        guard index < clipboardItems.count else { return }
+    func itemClicked(at index: Int) {
+        print("🎯 Item \(index) clicked!")
+        guard index < clipboardItems.count else { 
+            print("❌ Invalid index \(index), only have \(clipboardItems.count) items")
+            return 
+        }
         let selectedItem = clipboardItems[index]
+        print("✅ Selected: \(selectedItem)")
         delegate?.popupDidSelectItem(selectedItem)
         hide()
     }
     
     private func createWindow(at location: NSPoint) {
-        let itemHeight: CGFloat = 40
+        let itemHeight: CGFloat = 50 // Make items taller for easier clicking
         let windowWidth: CGFloat = 300
         let windowHeight = CGFloat(clipboardItems.count) * itemHeight
+        
+        print("📏 Creating window: width=\(windowWidth), height=\(windowHeight)")
         
         // Position window near cursor but ensure it's on screen
         var windowOrigin = NSPoint(x: location.x + 10, y: location.y - windowHeight - 10)
@@ -97,6 +118,8 @@ class ClipboardPopup: NSObject {
             height: windowHeight
         )
         
+        print("📍 Final window position: \(windowRect)")
+        
         window = NSWindow(
             contentRect: windowRect,
             styleMask: [.borderless],
@@ -104,7 +127,10 @@ class ClipboardPopup: NSObject {
             defer: false
         )
         
-        guard let window = window else { return }
+        guard let window = window else { 
+            print("❌ Failed to create window")
+            return 
+        }
         
         window.level = .floating
         window.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.95)
@@ -128,18 +154,22 @@ class ClipboardPopup: NSObject {
                 )
             )
             contentView.addSubview(itemView)
+            print("📝 Added item \(index): \(item)")
         }
         
         // Show window
         window.makeKeyAndOrderFront(nil)
+        print("✅ Window shown")
         
-        // Auto-hide after 5 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+        // Auto-hide after 10 seconds (increased time for testing)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) { [weak self] in
+            print("⏰ Auto-hiding popup after timeout")
             self?.hide()
         }
         
-        // Hide when clicking outside
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+        // Hide when clicking outside (but not inside the popup)
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            print("🖱️ Global click detected at \(event.locationInWindow)")
             self?.hide()
         }
     }
@@ -157,16 +187,35 @@ class ClipboardPopup: NSObject {
             containerView.addSubview(separator)
         }
         
+        // Add background for better visibility
+        containerView.wantsLayer = true
+        containerView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        containerView.layer?.borderColor = NSColor.separatorColor.cgColor
+        containerView.layer?.borderWidth = 0.5
+        
         // Truncate long text
         let displayText = item.truncated(to: 50)
         
         // Create label
         let label = NSTextField(labelWithString: displayText)
-        label.font = NSFont.systemFont(ofSize: 12)
+        label.font = NSFont.systemFont(ofSize: 13)
         label.textColor = NSColor.labelColor
-        label.frame = NSRect(x: 15, y: 8, width: frame.width - 30, height: 24)
+        label.frame = NSRect(x: 15, y: 12, width: frame.width - 30, height: 26)
         label.lineBreakMode = .byTruncatingTail
+        label.backgroundColor = NSColor.clear
+        label.isBordered = false
         containerView.addSubview(label)
+        
+        // Add click instruction
+        let instructionLabel = NSTextField(labelWithString: "Click to paste")
+        instructionLabel.font = NSFont.systemFont(ofSize: 10)
+        instructionLabel.textColor = NSColor.secondaryLabelColor
+        instructionLabel.frame = NSRect(x: 15, y: 2, width: frame.width - 30, height: 12)
+        instructionLabel.backgroundColor = NSColor.clear
+        instructionLabel.isBordered = false
+        containerView.addSubview(instructionLabel)
+        
+        print("🏗️ Created item view for index \(index) with frame \(frame)")
         
         return containerView
     }
