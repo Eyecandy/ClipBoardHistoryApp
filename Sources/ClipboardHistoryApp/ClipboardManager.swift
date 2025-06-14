@@ -15,8 +15,8 @@ class ClipboardManager {
     private let pasteboard = NSPasteboard.general
     
     func startMonitoring() {
-        // Get initial clipboard content
-        if let initialContent = pasteboard.string(forType: .string) {
+        // Get initial clipboard content safely
+        if let initialContent = getCurrentClipboardContent() {
             lastClipboardContent = initialContent
         }
         
@@ -31,9 +31,17 @@ class ClipboardManager {
         timer = nil
     }
     
+    private func getCurrentClipboardContent() -> String? {
+        guard let content = pasteboard.string(forType: .string),
+              !content.isEmpty,
+              content.trimmingCharacters(in: .whitespacesAndNewlines).count > 0 else {
+            return nil
+        }
+        return content
+    }
+    
     private func checkClipboardChanges() {
-        guard let currentContent = pasteboard.string(forType: .string),
-              !currentContent.isEmpty,
+        guard let currentContent = getCurrentClipboardContent(),
               currentContent != lastClipboardContent else {
             return
         }
@@ -58,6 +66,8 @@ class ClipboardManager {
     }
     
     func copyToClipboard(_ content: String) {
+        guard !content.isEmpty else { return }
+        
         pasteboard.clearContents()
         pasteboard.setString(content, forType: .string)
         lastClipboardContent = content
