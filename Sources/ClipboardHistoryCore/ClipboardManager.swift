@@ -1,12 +1,12 @@
 import Foundation
 import AppKit
 
-protocol ClipboardManagerDelegate: AnyObject {
+public protocol ClipboardManagerDelegate: AnyObject {
     func clipboardDidChange()
 }
 
-class ClipboardManager {
-    weak var delegate: ClipboardManagerDelegate?
+public class ClipboardManager {
+    public weak var delegate: ClipboardManagerDelegate?
     private var clipboardHistory: [String] = []
     private var timer: Timer?
     private var lastClipboardContent: String = ""
@@ -14,8 +14,12 @@ class ClipboardManager {
     
     private let pasteboard = NSPasteboard.general
     private let historyKey = "ClipboardHistory"
+    private let popupItemCountKey = "PopupItemCount"
+    private let defaultPopupItemCount = 3
     
-    func startMonitoring() {
+    public init() {}
+    
+    public func startMonitoring() {
         // Load saved history from UserDefaults
         loadHistory()
         
@@ -30,7 +34,7 @@ class ClipboardManager {
         }
     }
     
-    func stopMonitoring() {
+    public func stopMonitoring() {
         timer?.invalidate()
         timer = nil
     }
@@ -69,11 +73,11 @@ class ClipboardManager {
         delegate?.clipboardDidChange()
     }
     
-    func getHistory() -> [String] {
+    public func getHistory() -> [String] {
         return clipboardHistory
     }
     
-    func copyToClipboard(_ content: String) {
+    public func copyToClipboard(_ content: String) {
         guard !content.isEmpty else { return }
         
         pasteboard.clearContents()
@@ -84,13 +88,18 @@ class ClipboardManager {
         clipboardHistory.removeAll { $0 == content }
         clipboardHistory.insert(content, at: 0)
         
+        // Keep only the most recent items
+        if clipboardHistory.count > maxHistorySize {
+            clipboardHistory = Array(clipboardHistory.prefix(maxHistorySize))
+        }
+        
         // Save updated history
         saveHistory()
         
         delegate?.clipboardDidChange()
     }
     
-    func copySelectedItem(_ content: String) {
+    public func copySelectedItem(_ content: String) {
         guard !content.isEmpty else { return }
         
         pasteboard.clearContents()
@@ -101,16 +110,30 @@ class ClipboardManager {
         // Just update the last clipboard content to prevent duplicate detection
     }
     
-    func clearHistory() {
+    public func clearHistory() {
         clipboardHistory.removeAll()
         saveHistory() // Save the empty history
     }
     
-    func deleteItem(at index: Int) {
+    public func deleteItem(at index: Int) {
         guard index >= 0 && index < clipboardHistory.count else { return }
         clipboardHistory.remove(at: index)
         saveHistory()
         delegate?.clipboardDidChange()
+    }
+    
+    // MARK: - Popup Item Count Configuration
+    
+    public func getPopupItemCount() -> Int {
+        let count = UserDefaults.standard.integer(forKey: popupItemCountKey)
+        // Return default if not set, otherwise validate range
+        return count == 0 ? defaultPopupItemCount : max(1, min(20, count))
+    }
+    
+    public func setPopupItemCount(_ count: Int) {
+        let validatedCount = max(1, min(20, count))
+        UserDefaults.standard.set(validatedCount, forKey: popupItemCountKey)
+        UserDefaults.standard.synchronize()
     }
     
     // MARK: - Persistence
@@ -131,7 +154,7 @@ class ClipboardManager {
         }
     }
     
-    func saveHistoryOnExit() {
+    public func saveHistoryOnExit() {
         saveHistory()
         UserDefaults.standard.synchronize() // Force immediate save
         print("💾 History saved on app exit")

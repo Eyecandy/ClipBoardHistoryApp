@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 
-protocol ClipboardPopupDelegate: AnyObject {
+public protocol ClipboardPopupDelegate: AnyObject {
     func popupDidSelectItem(_ item: String)
     func popupDidRequestFullView(_ item: String)
     func popupDidRequestDelete(_ item: String)
@@ -52,16 +52,21 @@ class ClipboardItemView: NSView {
     }
 }
 
-class ClipboardPopup: NSObject {
-    weak var delegate: ClipboardPopupDelegate?
+public class ClipboardPopup: NSObject {
+    public weak var delegate: ClipboardPopupDelegate?
     private var window: NSWindow?
     private var clipboardItems: [String] = []
     private var eventMonitor: Any?
     
-    func show(with items: [String]) {
+    public override init() {
+        super.init()
+    }
+    
+    public func show(with items: [String], maxItems: Int = 3) {
         hide() // Hide any existing popup
         
-        clipboardItems = Array(items.prefix(3)) // Only show top 3 items
+        let validatedMaxItems = max(1, min(20, maxItems))
+        clipboardItems = Array(items.prefix(validatedMaxItems))
         guard !clipboardItems.isEmpty else { 
             return 
         }
@@ -70,7 +75,7 @@ class ClipboardPopup: NSObject {
         createWindow(at: mouseLocation)
     }
     
-    func hide() {
+    public func hide() {
         if let eventMonitor = eventMonitor {
             NSEvent.removeMonitor(eventMonitor)
             self.eventMonitor = nil
@@ -319,5 +324,23 @@ class ClipboardPopup: NSObject {
         instructionLabel.backgroundColor = NSColor.clear
         instructionLabel.isBordered = false
         containerView.addSubview(instructionLabel)
+    }
+}
+
+// MARK: - String Extensions
+public extension String {
+    func truncated(to length: Int, trailing: String = "...") -> String {
+        if self.count > length {
+            return String(self.prefix(length)) + trailing
+        } else {
+            return self
+        }
+    }
+    
+    func cleanedForDisplay() -> String {
+        return self.replacingOccurrences(of: "\n", with: " ")
+                   .replacingOccurrences(of: "\r", with: " ")
+                   .replacingOccurrences(of: "\t", with: " ")
+                   .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 } 

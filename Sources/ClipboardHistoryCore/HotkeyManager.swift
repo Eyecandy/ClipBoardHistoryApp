@@ -2,16 +2,18 @@ import Foundation
 import AppKit
 import Carbon
 
-protocol HotkeyManagerDelegate: AnyObject {
+public protocol HotkeyManagerDelegate: AnyObject {
     func hotkeyPressed()
 }
 
-class HotkeyManager {
-    weak var delegate: HotkeyManagerDelegate?
+public class HotkeyManager {
+    public weak var delegate: HotkeyManagerDelegate?
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     
-    func registerHotkey() {
+    public init() {}
+    
+    public func registerHotkey() {
         // Create event type for hotkey
         var eventType = EventTypeSpec()
         eventType.eventClass = OSType(kEventClassKeyboard)
@@ -62,7 +64,7 @@ class HotkeyManager {
         }
     }
     
-    func unregisterHotkey() {
+    public func unregisterHotkey() {
         if let hotKeyRef = hotKeyRef {
             UnregisterEventHotKey(hotKeyRef)
             self.hotKeyRef = nil
