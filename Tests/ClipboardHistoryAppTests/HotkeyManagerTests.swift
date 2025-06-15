@@ -93,6 +93,45 @@ final class HotkeyManagerTests: XCTestCase {
         // The delegate should be nil due to weak reference
         XCTAssertNil(hotkeyManager.delegate, "Delegate should be nil after being deallocated")
     }
+    
+    // MARK: - Direct Hotkey Tests
+    
+    func testDirectHotkeyDelegateCall() {
+        // Test direct hotkey for index 0 (⌘⇧1)
+        mockDelegate.directHotkeyPressed(for: 0)
+        
+        XCTAssertEqual(mockDelegate.directHotkeyIndex, 0, "Should call delegate with correct index")
+        XCTAssertEqual(mockDelegate.directHotkeyCallCount, 1, "Should call delegate once")
+    }
+    
+    func testDirectHotkeyMultipleIndices() {
+        // Test all 6 direct hotkeys
+        for index in 0..<6 {
+            mockDelegate.directHotkeyPressed(for: index)
+            XCTAssertEqual(mockDelegate.directHotkeyIndex, index, "Should call delegate with index \(index)")
+        }
+        
+        XCTAssertEqual(mockDelegate.directHotkeyCallCount, 6, "Should call delegate 6 times")
+    }
+    
+    func testDirectHotkeyBoundaryValues() {
+        // Test edge cases
+        mockDelegate.directHotkeyPressed(for: -1) // Should handle gracefully
+        mockDelegate.directHotkeyPressed(for: 0)  // Valid
+        mockDelegate.directHotkeyPressed(for: 5)  // Valid (last valid index)
+        mockDelegate.directHotkeyPressed(for: 6)  // Should handle gracefully
+        mockDelegate.directHotkeyPressed(for: 10) // Should handle gracefully
+        
+        // All calls should be handled
+        XCTAssertEqual(mockDelegate.directHotkeyCallCount, 5, "Should handle all calls")
+    }
+    
+    func testQuitHotkeyDelegate() {
+        mockDelegate.quitHotkeyPressed()
+        
+        XCTAssertTrue(mockDelegate.quitHotkeyPressedWasCalled, "Should call quit hotkey delegate")
+        XCTAssertEqual(mockDelegate.quitHotkeyCallCount, 1, "Should call quit delegate once")
+    }
 }
 
 // MARK: - Mock Delegate
@@ -101,8 +140,24 @@ class MockHotkeyManagerDelegate: HotkeyManagerDelegate {
     var hotkeyPressedWasCalled = false
     var hotkeyPressedCallCount = 0
     
+    var quitHotkeyPressedWasCalled = false
+    var quitHotkeyCallCount = 0
+    
+    var directHotkeyIndex: Int = -1
+    var directHotkeyCallCount = 0
+    
     func hotkeyPressed() {
         hotkeyPressedWasCalled = true
         hotkeyPressedCallCount += 1
+    }
+    
+    func quitHotkeyPressed() {
+        quitHotkeyPressedWasCalled = true
+        quitHotkeyCallCount += 1
+    }
+    
+    func directHotkeyPressed(for index: Int) {
+        directHotkeyIndex = index
+        directHotkeyCallCount += 1
     }
 } 

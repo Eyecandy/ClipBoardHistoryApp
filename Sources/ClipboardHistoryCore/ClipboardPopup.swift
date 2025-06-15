@@ -480,7 +480,6 @@ public class ClipboardPopup: NSObject {
         containerView.addSubview(label)
         
         // Add click instruction with dynamic hotkey info
-        let maxHotkeyIndex = min(containerView.index + 1, 6)
         let instructionText = containerView.index < 6 ? 
             "Click: copy • ⌘+click: view full • ⌘⇧\(containerView.index + 1): direct copy" :
             "Click: copy • ⌘+click: view full • Right-click: options"

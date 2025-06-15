@@ -534,12 +534,12 @@ extension AppDelegate: ClipboardHistoryCore.HotkeyManagerDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let history = self?.clipboardManager?.getHistory(),
                   index < history.count else {
-                print("⚠️ Direct hotkey pressed for index \(index + 1) but only \(self?.clipboardManager?.getHistory().count ?? 0) items available")
+                // Direct hotkey pressed but insufficient items available
                 return
             }
             
             let selectedItem = history[index]
-            print("🎯 Direct hotkey ⌘⇧\(index + 1) pressed - copying: \(selectedItem.prefix(50))...")
+            // Direct hotkey pressed - copying item silently for security
             self?.clipboardManager?.copySelectedItem(selectedItem)
         }
     }

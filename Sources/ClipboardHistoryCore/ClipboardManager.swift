@@ -144,7 +144,7 @@ public class ClipboardManager {
     
     private func loadHistory() {
         if let savedHistory = UserDefaults.standard.array(forKey: historyKey) as? [String] {
-            clipboardHistory = Array(savedHistory.prefix(maxHistorySize))
+            clipboardHistory = savedHistory
             print("📚 Loaded \(clipboardHistory.count) items from saved history")
             
             // Trigger UI update after loading history
@@ -155,7 +155,7 @@ public class ClipboardManager {
     }
     
     public func saveHistoryOnExit() {
-        saveHistory()
+        UserDefaults.standard.set(clipboardHistory, forKey: historyKey)
         UserDefaults.standard.synchronize() // Force immediate save
         print("💾 History saved on app exit")
     }

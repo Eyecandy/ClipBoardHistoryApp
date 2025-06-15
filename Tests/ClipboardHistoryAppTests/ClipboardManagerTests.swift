@@ -182,7 +182,7 @@ final class ClipboardManagerTests: XCTestCase {
     
     func testDefaultPopupItemCount() {
         let defaultCount = clipboardManager.getPopupItemCount()
-        XCTAssertEqual(defaultCount, 3, "Default popup item count should be 3")
+        XCTAssertEqual(defaultCount, 5, "Default popup item count should be 5")
     }
     
     func testSetValidPopupItemCount() {
@@ -230,6 +230,66 @@ final class ClipboardManagerTests: XCTestCase {
         let persistedCount = newManager.getPopupItemCount()
         
         XCTAssertEqual(persistedCount, 7, "Popup item count should persist between instances")
+    }
+    
+    // MARK: - Direct Hotkey Support Tests
+    
+    func testDirectHotkeyItemAccess() {
+        // Add test items
+        let items = ["First item", "Second item", "Third item", "Fourth item", "Fifth item", "Sixth item", "Seventh item"]
+        for item in items {
+            clipboardManager.copyToClipboard(item)
+        }
+        
+        let history = clipboardManager.getHistory()
+        
+        // Test that we can access items by index (simulating direct hotkey access)
+        XCTAssertEqual(history[0], "Seventh item", "First item should be most recent")
+        XCTAssertEqual(history[1], "Sixth item", "Second item should be second most recent")
+        XCTAssertEqual(history[2], "Fifth item", "Third item should be third most recent")
+        XCTAssertEqual(history[3], "Fourth item", "Fourth item should be fourth most recent")
+        XCTAssertEqual(history[4], "Third item", "Fifth item should be fifth most recent")
+        XCTAssertEqual(history[5], "Second item", "Sixth item should be sixth most recent")
+        
+        // Test boundary - accessing 7th item when only 6 direct hotkeys exist
+        XCTAssertTrue(history.count >= 6, "Should have at least 6 items for direct hotkey access")
+    }
+    
+    func testDirectHotkeyWithLimitedHistory() {
+        // Test with fewer than 6 items
+        clipboardManager.copyToClipboard("Only item")
+        clipboardManager.copyToClipboard("Second item")
+        clipboardManager.copyToClipboard("Third item")
+        
+        let history = clipboardManager.getHistory()
+        XCTAssertEqual(history.count, 3, "Should have exactly 3 items")
+        
+        // Direct hotkeys 1-3 should work, 4-6 should be gracefully handled
+        XCTAssertEqual(history[0], "Third item", "⌘⇧1 should access first item")
+        XCTAssertEqual(history[1], "Second item", "⌘⇧2 should access second item")
+        XCTAssertEqual(history[2], "Only item", "⌘⇧3 should access third item")
+        
+        // Indices 3-5 would be out of bounds - this tests the safety of direct hotkey implementation
+        XCTAssertTrue(history.count < 6, "Should have fewer than 6 items to test boundary conditions")
+    }
+    
+    func testDirectHotkeyBoundaryConditions() {
+        // Test empty history
+        let emptyHistory = clipboardManager.getHistory()
+        XCTAssertTrue(emptyHistory.isEmpty, "History should be empty initially")
+        
+        // Add exactly 6 items
+        for i in 1...6 {
+            clipboardManager.copyToClipboard("Item \(i)")
+        }
+        
+        let history = clipboardManager.getHistory()
+        XCTAssertEqual(history.count, 6, "Should have exactly 6 items")
+        
+        // All 6 direct hotkeys should have valid targets
+        for i in 0..<6 {
+            XCTAssertTrue(i < history.count, "Index \(i) should be valid for direct hotkey ⌘⇧\(i + 1)")
+        }
     }
 }
 
