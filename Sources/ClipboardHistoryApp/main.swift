@@ -35,12 +35,76 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
-            button.image = NSImage(
-                systemSymbolName: "scissors",
-                accessibilityDescription: "Clipboard History"
-            )
+            button.image = createClipboardIcon()
+            button.toolTip = "Clipboard History - Press ⌘⇧C for quick access"
         }
         updateMenu()
+    }
+    
+    private func createClipboardIcon() -> NSImage? {
+        // Try to use the modern clipboard system symbol first
+        if let clipboardImage = NSImage(systemSymbolName: "clipboard", accessibilityDescription: "Clipboard History") {
+            // Configure the symbol for menu bar use
+            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+            return clipboardImage.withSymbolConfiguration(config)
+        }
+        
+        // Fallback: Create a custom clipboard icon programmatically
+        let size = NSSize(width: 16, height: 16)
+        let image = NSImage(size: size)
+        
+        image.lockFocus()
+        
+        // Set up the drawing context
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            image.unlockFocus()
+            return nil
+        }
+        
+        // Clear the background
+        context.clear(CGRect(origin: .zero, size: size))
+        
+        // Draw clipboard background (main rectangle)
+        let clipboardRect = CGRect(x: 2, y: 1, width: 12, height: 14)
+        context.setFillColor(NSColor.controlAccentColor.cgColor)
+        context.fillEllipse(in: CGRect(x: 1, y: 0, width: 14, height: 16)) // Rounded background
+        
+        // Draw clipboard outline
+        context.setStrokeColor(NSColor.labelColor.cgColor)
+        context.setLineWidth(1.0)
+        context.stroke(clipboardRect)
+        
+        // Draw clipboard clip at top
+        let clipRect = CGRect(x: 5, y: 12, width: 6, height: 3)
+        context.setFillColor(NSColor.secondaryLabelColor.cgColor)
+        context.fill(clipRect)
+        context.stroke(clipRect)
+        
+        // Draw some lines to represent text
+        context.setStrokeColor(NSColor.labelColor.cgColor)
+        context.setLineWidth(0.5)
+        
+        // Line 1
+        context.move(to: CGPoint(x: 4, y: 9))
+        context.addLine(to: CGPoint(x: 12, y: 9))
+        context.strokePath()
+        
+        // Line 2
+        context.move(to: CGPoint(x: 4, y: 7))
+        context.addLine(to: CGPoint(x: 10, y: 7))
+        context.strokePath()
+        
+        // Line 3
+        context.move(to: CGPoint(x: 4, y: 5))
+        context.addLine(to: CGPoint(x: 11, y: 5))
+        context.strokePath()
+        
+        image.unlockFocus()
+        
+        // Make it template so it adapts to dark/light mode
+        image.isTemplate = true
+        
+        return image
     }
     
     private func setupClipboardManager() {
