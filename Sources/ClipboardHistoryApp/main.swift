@@ -20,6 +20,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Hide the dock icon
         NSApp.setActivationPolicy(.accessory)
         
+        // Check if this is first run and show disclaimer
+        checkFirstRunDisclaimer()
+        
         setupStatusItem()
         
         // Delay clipboard manager setup to avoid initialization issues
@@ -31,6 +34,61 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             self.setupHotkeyManager()
             self.setupClipboardPopup()
+        }
+    }
+    
+    private func checkFirstRunDisclaimer() {
+        let hasShownDisclaimer = UserDefaults.standard.bool(forKey: "HasShownLegalDisclaimer")
+        if !hasShownDisclaimer {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                self.showFirstRunDisclaimer()
+            }
+        }
+    }
+    
+    private func showFirstRunDisclaimer() {
+        let alert = NSAlert()
+        alert.messageText = "Welcome to ClipboardHistoryApp"
+        alert.informativeText = """
+        Before using this app, please read these important disclaimers:
+        
+        🛡️ LEGAL NOTICE:
+        • This software is provided "AS IS" without warranty
+        • You assume all risks associated with its use
+        • We are not liable for data loss or security issues
+        
+        🔒 PRIVACY & SECURITY:
+        • Clipboard data may contain sensitive information
+        • All data is stored locally on your device only
+        • You are responsible for compliance with applicable laws
+        • Consider clearing history regularly if handling sensitive data
+        
+        ⚖️ YOUR RESPONSIBILITIES:
+        • Ensure compliance with your organization's policies
+        • Do not use in prohibited environments
+        • Understand the security implications
+        
+        By clicking "I Agree", you acknowledge reading and accepting the full license terms and disclaimers.
+        """
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "I Agree")
+        alert.addButton(withTitle: "View Full License")
+        alert.addButton(withTitle: "Quit")
+        
+        let response = alert.runModal()
+        switch response {
+        case .alertFirstButtonReturn: // I Agree
+            UserDefaults.standard.set(true, forKey: "HasShownLegalDisclaimer")
+        case .alertSecondButtonReturn: // View Full License
+            showLicenseDialog()
+            // Show disclaimer again after viewing license
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                self.showFirstRunDisclaimer()
+            }
+        case .alertThirdButtonReturn: // Quit
+            NSApplication.shared.terminate(nil)
+        default:
+            break
         }
     }
     
@@ -282,6 +340,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(settingsItem)
         menu.addItem(NSMenuItem.separator())
         
+        // Add about/license option
+        let aboutItem = NSMenuItem(title: "About ClipboardHistoryApp", action: #selector(showAbout), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+        
         // Add quit option
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
@@ -460,6 +523,84 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             fullTextWindow = nil
             fullTextContent = nil
         }
+    }
+    
+    @objc func showAbout() {
+        let alert = NSAlert()
+        alert.messageText = "ClipboardHistoryApp v1.0"
+        alert.informativeText = """
+        A professional macOS clipboard history manager with global hotkeys.
+        
+        Features:
+        • 7 Global Hotkeys (⌘⇧C + ⌘⇧1-6)
+        • Visual numbered indices
+        • Smart auto-hide with mouse tracking
+        • Focus preservation
+        • Persistent history (up to 20 items)
+        • Full text viewing with ⌘+Click
+        
+        ⚠️ IMPORTANT DISCLAIMERS:
+        • Software provided "AS IS" without warranty
+        • Users responsible for compliance with applicable laws
+        • Clipboard data may contain sensitive information
+        • All data stored locally on your device only
+        • Not liable for data loss or security issues
+        
+        Copyright © 2024 ClipboardHistoryApp
+        Licensed under MIT License with Additional Terms
+        
+        By using this software, you acknowledge reading and agreeing to the license terms and disclaimers.
+        """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "View Full License")
+        
+        let response = alert.runModal()
+        if response == .alertSecondButtonReturn {
+            showLicenseDialog()
+        }
+    }
+    
+    private func showLicenseDialog() {
+        // Read license from bundle or show embedded version
+        let licenseText = """
+MIT License with Additional Terms
+
+Copyright (c) 2024 ClipboardHistoryApp
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+ADDITIONAL DISCLAIMERS AND LIMITATIONS:
+
+PRIVACY AND DATA HANDLING:
+- This software accesses clipboard data solely for clipboard history functionality
+- All clipboard data is stored locally on the user's device
+- No clipboard data is transmitted over networks or shared with third parties
+- Users are responsible for ensuring compliance with applicable privacy laws
+
+SECURITY CONSIDERATIONS:
+- This software requires accessibility permissions to function
+- Users should be aware that clipboard data may contain sensitive information
+- The software does not encrypt stored clipboard data
+- Users are advised to regularly clear clipboard history if handling sensitive data
+
+LIMITATION OF LIABILITY:
+- The authors and contributors shall not be liable for any data loss, security breaches, or system damage resulting from the use of this software
+- Users assume all risks associated with the use of this software
+- This software is provided for convenience and productivity purposes only
+
+COMPLIANCE:
+- Users are responsible for ensuring their use of this software complies with all applicable laws, regulations, and organizational policies
+- The software should not be used in environments where clipboard monitoring is prohibited or restricted
+
+By using this software, you acknowledge that you have read, understood, and agree to be bound by these terms and disclaimers.
+"""
+        
+        showFullTextDialog(for: licenseText)
     }
 
     @objc func quit() {

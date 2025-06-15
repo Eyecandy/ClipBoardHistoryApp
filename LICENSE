@@ -1,0 +1,59 @@
+MIT License with Additional Terms
+
+Copyright (c) 2024 ClipboardHistoryApp
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+ADDITIONAL DISCLAIMERS AND LIMITATIONS
+================================================================================
+
+PRIVACY AND DATA HANDLING:
+- This software accesses clipboard data solely for the purpose of providing
+  clipboard history functionality
+- All clipboard data is stored locally on the user's device
+- No clipboard data is transmitted over networks or shared with third parties
+- Users are responsible for ensuring they comply with applicable privacy laws
+  and regulations when using this software
+
+SECURITY CONSIDERATIONS:
+- This software requires accessibility permissions to function
+- Users should be aware that clipboard data may contain sensitive information
+- The software does not encrypt stored clipboard data
+- Users are advised to regularly clear clipboard history if handling sensitive data
+
+SYSTEM COMPATIBILITY:
+- This software is designed for macOS systems
+- Compatibility with future macOS versions is not guaranteed
+- Users should test the software in their specific environment before relying on it
+
+LIMITATION OF LIABILITY:
+- The authors and contributors shall not be liable for any data loss, security
+  breaches, or system damage resulting from the use of this software
+- Users assume all risks associated with the use of this software
+- This software is provided for convenience and productivity purposes only
+
+COMPLIANCE:
+- Users are responsible for ensuring their use of this software complies with
+  all applicable laws, regulations, and organizational policies
+- The software should not be used in environments where clipboard monitoring
+  is prohibited or restricted
+
+By using this software, you acknowledge that you have read, understood, and
+agree to be bound by these terms and disclaimers. 
