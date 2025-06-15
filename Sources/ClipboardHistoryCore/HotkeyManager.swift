@@ -4,11 +4,13 @@ import Carbon
 
 public protocol HotkeyManagerDelegate: AnyObject {
     func hotkeyPressed()
+    func quitHotkeyPressed()
 }
 
 public class HotkeyManager {
     public weak var delegate: HotkeyManagerDelegate?
     private var hotKeyRef: EventHotKeyRef?
+    private var quitHotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     
     public init() {}
@@ -22,12 +24,21 @@ public class HotkeyManager {
         // Install event handler
         let status = InstallEventHandler(
             GetApplicationEventTarget(),
-            { _, _, userData -> OSStatus in
+            { _, event, userData -> OSStatus in
                 // This is called when our hotkey is pressed
                 if let userData = userData {
                     let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
+                    
+                    // Get the hotkey ID to determine which hotkey was pressed
+                    var hotKeyID = EventHotKeyID()
+                    GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+                    
                     DispatchQueue.main.async {
-                        manager.delegate?.hotkeyPressed()
+                        if hotKeyID.id == 1 {
+                            manager.delegate?.hotkeyPressed()
+                        } else if hotKeyID.id == 2 {
+                            manager.delegate?.quitHotkeyPressed()
+                        }
                     }
                 }
                 return noErr
@@ -62,12 +73,19 @@ public class HotkeyManager {
         } else {
             print("❌ Failed to register hotkey: \(registerStatus)")
         }
+        
+        // TODO: Re-enable quit hotkey after fixing crash
+        // Temporarily disabled due to crash issues
     }
     
     public func unregisterHotkey() {
         if let hotKeyRef = hotKeyRef {
             UnregisterEventHotKey(hotKeyRef)
             self.hotKeyRef = nil
+        }
+        if let quitHotKeyRef = quitHotKeyRef {
+            UnregisterEventHotKey(quitHotKeyRef)
+            self.quitHotKeyRef = nil
         }
         if let eventHandler = eventHandler {
             RemoveEventHandler(eventHandler)

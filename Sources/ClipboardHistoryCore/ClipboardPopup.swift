@@ -84,6 +84,10 @@ public class ClipboardPopup: NSObject {
         window = nil
     }
     
+    public func isVisible() -> Bool {
+        return window?.isVisible ?? false
+    }
+    
     func itemClicked(at index: Int) {
         guard index < clipboardItems.count else { 
             return 
@@ -179,12 +183,23 @@ public class ClipboardPopup: NSObject {
     }
     
     private func calculateWindowDimensions() -> (width: CGFloat, height: CGFloat) {
-        let itemHeight: CGFloat = 50 // Make items taller for easier clicking
-        let windowWidth: CGFloat = 300
-        let windowHeight = CGFloat(clipboardItems.count) * itemHeight
+        let itemHeight: CGFloat = 60 // Fixed height per item for consistency
+        let windowWidth: CGFloat = 350
+        let maxWindowHeight: CGFloat = 400 // Maximum popup height
+        let idealHeight = CGFloat(clipboardItems.count) * itemHeight
         
+        // Limit window height to screen space
+        if let screen = NSScreen.main {
+            let screenHeight = screen.visibleFrame.height
+            let maxAllowedHeight = min(maxWindowHeight, screenHeight * 0.7) // Use max 70% of screen height
+            let windowHeight = min(idealHeight, maxAllowedHeight)
+            return (width: windowWidth, height: windowHeight)
+        }
+        
+        let windowHeight = min(idealHeight, maxWindowHeight)
         return (width: windowWidth, height: windowHeight)
     }
+
     
     private func calculateWindowPosition(
         at location: NSPoint,
@@ -226,6 +241,11 @@ public class ClipboardPopup: NSObject {
     private func setupWindowContent(windowDimensions: (width: CGFloat, height: CGFloat)) {
         guard let window = window else { return }
         
+        let itemHeight: CGFloat = 60
+        let totalContentHeight = CGFloat(clipboardItems.count) * itemHeight
+        let needsScrolling = totalContentHeight > windowDimensions.height
+        
+        // Create main content view
         let contentView = NSView(
             frame: NSRect(
                 x: 0,
@@ -236,16 +256,63 @@ public class ClipboardPopup: NSObject {
         )
         window.contentView = contentView
         
-        // Add clipboard items
+        if needsScrolling {
+            setupScrollableContent(contentView: contentView, windowDimensions: windowDimensions)
+        } else {
+            setupStaticContent(contentView: contentView, windowDimensions: windowDimensions)
+        }
+    }
+    
+    private func setupScrollableContent(contentView: NSView, windowDimensions: (width: CGFloat, height: CGFloat)) {
+        let itemHeight: CGFloat = 60
+        let totalContentHeight = CGFloat(clipboardItems.count) * itemHeight
+        
+        // Create scroll view
+        let scrollView = NSScrollView(
+            frame: NSRect(x: 0, y: 0, width: windowDimensions.width, height: windowDimensions.height)
+        )
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = false
+        scrollView.scrollerStyle = .overlay
+        
+        // Create document view for all content
+        let documentView = NSView(
+            frame: NSRect(x: 0, y: 0, width: windowDimensions.width - 15, height: totalContentHeight) // -15 for scroller
+        )
+        
+        // Add clipboard items to document view
         for (index, item) in clipboardItems.enumerated() {
             let itemView = createItemView(
                 item: item,
                 index: index,
                 frame: NSRect(
                     x: 0,
-                    y: windowDimensions.height - CGFloat(index + 1) * 50,
+                    y: totalContentHeight - CGFloat(index + 1) * itemHeight,
+                    width: windowDimensions.width - 15, // Account for scrollbar
+                    height: itemHeight
+                )
+            )
+            documentView.addSubview(itemView)
+        }
+        
+        scrollView.documentView = documentView
+        contentView.addSubview(scrollView)
+    }
+    
+    private func setupStaticContent(contentView: NSView, windowDimensions: (width: CGFloat, height: CGFloat)) {
+        let itemHeight: CGFloat = 60
+        
+        // Add clipboard items directly (no scrolling needed)
+        for (index, item) in clipboardItems.enumerated() {
+            let itemView = createItemView(
+                item: item,
+                index: index,
+                frame: NSRect(
+                    x: 0,
+                    y: windowDimensions.height - CGFloat(index + 1) * itemHeight,
                     width: windowDimensions.width,
-                    height: 50
+                    height: itemHeight
                 )
             )
             contentView.addSubview(itemView)
@@ -303,13 +370,13 @@ public class ClipboardPopup: NSObject {
     
     private func addLabelsToContainer(_ containerView: ClipboardItemView, item: String, frame: NSRect) {
         // Clean up text for display - replace newlines with spaces and truncate
-        let displayText = item.cleanedForDisplay().truncated(to: 50)
+        let displayText = item.cleanedForDisplay().truncated(to: 60)
         
         // Create label
         let label = NSTextField(labelWithString: displayText)
         label.font = NSFont.systemFont(ofSize: 13)
         label.textColor = NSColor.labelColor
-        label.frame = NSRect(x: 15, y: 12, width: frame.width - 30, height: 26)
+        label.frame = NSRect(x: 15, y: 25, width: frame.width - 30, height: 20)
         label.lineBreakMode = .byTruncatingTail
         label.backgroundColor = NSColor.clear
         label.isBordered = false
@@ -320,11 +387,12 @@ public class ClipboardPopup: NSObject {
         let instructionLabel = NSTextField(labelWithString: instructionText)
         instructionLabel.font = NSFont.systemFont(ofSize: 9)
         instructionLabel.textColor = NSColor.secondaryLabelColor
-        instructionLabel.frame = NSRect(x: 15, y: 2, width: frame.width - 30, height: 12)
+        instructionLabel.frame = NSRect(x: 15, y: 5, width: frame.width - 30, height: 12)
         instructionLabel.backgroundColor = NSColor.clear
         instructionLabel.isBordered = false
         containerView.addSubview(instructionLabel)
     }
+
 }
 
 // MARK: - String Extensions

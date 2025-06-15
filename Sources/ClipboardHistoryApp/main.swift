@@ -13,6 +13,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var clipboardManager: ClipboardHistoryCore.ClipboardManager?
     var hotkeyManager: ClipboardHistoryCore.HotkeyManager?
     var clipboardPopup: ClipboardHistoryCore.ClipboardPopup?
+    var fullTextWindow: NSWindow?
+    var fullTextContent: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide the dock icon
@@ -267,7 +269,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         
         // Add quit option
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
     }
     
     @objc func selectClipboardItem(_ sender: NSMenuItem) {
@@ -309,23 +313,150 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func showFullTextDialog(for text: String) {
-        let alert = NSAlert()
-        alert.messageText = "Full Clipboard Content"
-        alert.informativeText = text
-        alert.addButton(withTitle: "Copy")
-        alert.addButton(withTitle: "Close")
-        alert.alertStyle = .informational
+        // Close any existing full text window first
+        if let existingWindow = fullTextWindow {
+            existingWindow.close()
+            fullTextWindow = nil
+            fullTextContent = nil
+        }
         
-        // Make the alert resizable for long text
-        alert.window.setContentSize(NSSize(width: 500, height: 400))
+        // Create a custom window for scrollable text display
+        let windowRect = NSRect(x: 0, y: 0, width: 600, height: 500)
+        let window = NSWindow(
+            contentRect: windowRect,
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
         
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            clipboardManager?.copySelectedItem(text)
+        window.title = "Full Clipboard Content"
+        window.center()
+        window.minSize = NSSize(width: 400, height: 300)
+        window.delegate = self
+        window.isReleasedWhenClosed = false  // Prevent automatic release
+        
+        // Create main content view
+        let contentView = NSView(frame: windowRect)
+        window.contentView = contentView
+        
+        // Create scroll view for the text
+        let scrollView = NSScrollView(frame: NSRect(x: 20, y: 60, width: windowRect.width - 40, height: windowRect.height - 120))
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.autohidesScrollers = false
+        scrollView.borderType = .bezelBorder
+        scrollView.autoresizingMask = [.width, .height]
+        
+        // Create text view with proper setup for scrolling
+        let textView = NSTextView()
+        textView.string = text
+        textView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        textView.textColor = NSColor.labelColor
+        textView.backgroundColor = NSColor.textBackgroundColor
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isRichText = false
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.minSize = NSSize(width: 0, height: 0)
+        
+        // Configure text container for proper scrolling
+        if let textContainer = textView.textContainer {
+            textContainer.containerSize = NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+            textContainer.widthTracksTextView = true
+            textContainer.heightTracksTextView = false
+        }
+        
+        // Set up the text view frame to match scroll view content size
+        textView.frame = NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: scrollView.contentSize.height)
+        
+        // Set the document view and add to content view
+        scrollView.documentView = textView
+        contentView.addSubview(scrollView)
+        
+        // Force layout and ensure text is visible
+        textView.needsLayout = true
+        textView.layoutManager?.ensureLayout(for: textView.textContainer!)
+        
+        // Scroll to top to ensure text is visible
+        textView.scrollRangeToVisible(NSRange(location: 0, length: 0))
+        
+        // Create buttons
+        let buttonHeight: CGFloat = 32
+        let buttonWidth: CGFloat = 80
+        let buttonSpacing: CGFloat = 10
+        let buttonY: CGFloat = 20
+        
+        let copyButton = NSButton(frame: NSRect(
+            x: windowRect.width - (buttonWidth * 2) - buttonSpacing - 20,
+            y: buttonY,
+            width: buttonWidth,
+            height: buttonHeight
+        ))
+        copyButton.title = "Copy"
+        copyButton.bezelStyle = .rounded
+        copyButton.target = self
+        copyButton.action = #selector(copyFromFullTextDialog(_:))
+        copyButton.autoresizingMask = [.minXMargin, .maxYMargin]
+        contentView.addSubview(copyButton)
+        
+        let closeButton = NSButton(frame: NSRect(
+            x: windowRect.width - buttonWidth - 20,
+            y: buttonY,
+            width: buttonWidth,
+            height: buttonHeight
+        ))
+        closeButton.title = "Close"
+        closeButton.bezelStyle = .rounded
+        closeButton.target = self
+        closeButton.action = #selector(closeFullTextDialog(_:))
+        closeButton.keyEquivalent = "\u{1b}" // Escape key
+        closeButton.autoresizingMask = [.minXMargin, .maxYMargin]
+        contentView.addSubview(closeButton)
+        
+        // Add character count label
+        let charCountLabel = NSTextField(labelWithString: "Characters: \(text.count)")
+        charCountLabel.font = NSFont.systemFont(ofSize: 11)
+        charCountLabel.textColor = NSColor.secondaryLabelColor
+        charCountLabel.frame = NSRect(x: 20, y: buttonY + 8, width: 200, height: 16)
+        charCountLabel.autoresizingMask = [.maxXMargin, .maxYMargin]
+        contentView.addSubview(charCountLabel)
+        
+        // Store the window and text for button actions
+        fullTextWindow = window
+        fullTextContent = text
+        
+        // Show window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    @objc private func copyFromFullTextDialog(_ sender: NSButton) {
+        guard let text = fullTextContent else { return }
+        clipboardManager?.copySelectedItem(text)
+        closeFullTextDialog(sender)
+    }
+    
+    @objc private func closeFullTextDialog(_ sender: NSButton) {
+        // Close the window safely
+        if let window = fullTextWindow {
+            window.delegate = nil  // Remove delegate to prevent callbacks
+            window.close()
+            fullTextWindow = nil
+            fullTextContent = nil
         }
     }
 
     @objc func quit() {
+        // Clean up full text window if open
+        if let window = fullTextWindow {
+            window.delegate = nil
+            window.close()
+            fullTextWindow = nil
+            fullTextContent = nil
+        }
+        
         hotkeyManager?.unregisterHotkey()
         clipboardManager?.stopMonitoring()
         clipboardPopup?.hide()
@@ -335,6 +466,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         // Ensure history is saved when app quits
         clipboardManager?.saveHistoryOnExit()
+    }
+}
+
+// MARK: - NSWindowDelegate
+extension AppDelegate: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        // Clean up when full text window is closed
+        if let window = notification.object as? NSWindow,
+           window === fullTextWindow {
+            // Remove delegate to prevent further callbacks
+            window.delegate = nil
+            fullTextWindow = nil
+            fullTextContent = nil
+        }
+    }
+    
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        // Always allow window to close
+        return true
     }
 }
 
@@ -357,6 +507,12 @@ extension AppDelegate: ClipboardHistoryCore.HotkeyManagerDelegate {
             
             let maxItems = self?.clipboardManager?.getPopupItemCount() ?? 3
             self?.clipboardPopup?.show(with: history, maxItems: maxItems)
+        }
+    }
+    
+    func quitHotkeyPressed() {
+        DispatchQueue.main.async { [weak self] in
+            self?.quit()
         }
     }
 }
