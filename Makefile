@@ -29,6 +29,8 @@ help:
 	@echo "  clean-install - Clean, build, bundle, and install"
 	@echo "  lint          - Run code quality checks"
 	@echo "  package       - Create distributable package"
+	@echo "  prepare-release - Prepare GitHub release with package"
+	@echo "  reset-disclaimer - Reset legal disclaimer for testing"
 	@echo ""
 	@echo "Development workflow:"
 	@echo "  make run      - Quick development testing"
@@ -211,4 +213,11 @@ prepare-release:
 		echo "❌ Release script not found. Run this from project root."; \
 		exit 1; \
 	fi
-	@./scripts/create-release.sh 
+	@./scripts/create-release.sh
+
+# Development helpers
+.PHONY: reset-disclaimer
+reset-disclaimer:
+	@echo "🔄 Resetting legal disclaimer for testing..."
+	@defaults delete ClipboardHistoryApp HasShownLegalDisclaimer 2>/dev/null || echo "ℹ️  No disclaimer setting found (normal for first run)"
+	@echo "✅ Disclaimer reset - will show on next app launch" 

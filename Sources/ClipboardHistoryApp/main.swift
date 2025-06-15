@@ -50,46 +50,220 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let alert = NSAlert()
         alert.messageText = "Welcome to ClipboardHistoryApp"
         alert.informativeText = """
-        Before using this app, please read these important disclaimers:
+        Before using this app, please read the complete license terms and disclaimers.
         
-        🛡️ LEGAL NOTICE:
-        • This software is provided "AS IS" without warranty
-        • You assume all risks associated with its use
-        • We are not liable for data loss or security issues
+        By clicking "View License & Agree", you will see the full license text and can then accept the terms to continue using the app.
         
-        🔒 PRIVACY & SECURITY:
-        • Clipboard data may contain sensitive information
-        • All data is stored locally on your device only
-        • You are responsible for compliance with applicable laws
-        • Consider clearing history regularly if handling sensitive data
-        
-        ⚖️ YOUR RESPONSIBILITIES:
-        • Ensure compliance with your organization's policies
-        • Do not use in prohibited environments
-        • Understand the security implications
-        
-        By clicking "I Agree", you acknowledge reading and accepting the full license terms and disclaimers.
+        You can also view the complete license at any time via the "License" menu item.
         """
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "I Agree")
-        alert.addButton(withTitle: "View Full License")
+        alert.addButton(withTitle: "View License & Agree")
         alert.addButton(withTitle: "Quit")
         
         let response = alert.runModal()
         switch response {
-        case .alertFirstButtonReturn: // I Agree
-            UserDefaults.standard.set(true, forKey: "HasShownLegalDisclaimer")
-        case .alertSecondButtonReturn: // View Full License
-            showLicenseDialog()
-            // Show disclaimer again after viewing license
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                self.showFirstRunDisclaimer()
-            }
-        case .alertThirdButtonReturn: // Quit
+        case .alertFirstButtonReturn: // View License & Agree
+            showFirstRunLicenseDialog()
+        case .alertSecondButtonReturn: // Quit
             NSApplication.shared.terminate(nil)
         default:
             break
         }
+    }
+    
+    private func showFirstRunLicenseDialog() {
+        // Get the complete license text
+        let licenseText = """
+MIT License with Additional Terms
+
+Copyright (c) 2024 ClipboardHistoryApp
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+ADDITIONAL DISCLAIMERS AND LIMITATIONS
+================================================================================
+
+PRIVACY AND DATA HANDLING:
+- This software accesses clipboard data solely for the purpose of providing
+  clipboard history functionality
+- All clipboard data is stored locally on the user's device
+- No clipboard data is transmitted over networks or shared with third parties
+- Users are responsible for ensuring they comply with applicable privacy laws
+  and regulations when using this software
+
+SECURITY CONSIDERATIONS:
+- This software requires accessibility permissions to function
+- Users should be aware that clipboard data may contain sensitive information
+- The software does not encrypt stored clipboard data
+- Users are advised to regularly clear clipboard history if handling sensitive data
+
+SYSTEM COMPATIBILITY:
+- This software is designed for macOS systems
+- Compatibility with future macOS versions is not guaranteed
+- Users should test the software in their specific environment before relying on it
+
+LIMITATION OF LIABILITY:
+- The authors and contributors shall not be liable for any data loss, security
+  breaches, or system damage resulting from the use of this software
+- Users assume all risks associated with the use of this software
+- This software is provided for convenience and productivity purposes only
+
+COMPLIANCE:
+- Users are responsible for ensuring their use of this software complies with
+  all applicable laws, regulations, and organizational policies
+- The software should not be used in environments where clipboard monitoring
+  is prohibited or restricted
+
+By using this software, you acknowledge that you have read, understood, and
+agree to be bound by these terms and disclaimers.
+"""
+        
+        showFirstRunLicenseWindow(for: licenseText)
+    }
+    
+    private func showFirstRunLicenseWindow(for text: String) {
+        // Close any existing full text window first
+        if let existingWindow = fullTextWindow {
+            existingWindow.close()
+            fullTextWindow = nil
+            fullTextContent = nil
+        }
+        
+        // Create a custom window for scrollable license display
+        let windowRect = NSRect(x: 0, y: 0, width: 700, height: 600)
+        let window = NSWindow(
+            contentRect: windowRect,
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        window.title = "License Agreement - ClipboardHistoryApp"
+        window.center()
+        window.delegate = self
+        window.isReleasedWhenClosed = false  // Prevent automatic release
+        
+        // Create main content view
+        let contentView = NSView(frame: windowRect)
+        window.contentView = contentView
+        
+        // Create scroll view for the text
+        let scrollView = NSScrollView(frame: NSRect(x: 20, y: 80, width: windowRect.width - 40, height: windowRect.height - 140))
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.autohidesScrollers = false
+        scrollView.borderType = .bezelBorder
+        scrollView.autoresizingMask = [.width, .height]
+        
+        // Create text view with proper setup for scrolling
+        let textView = NSTextView()
+        textView.string = text
+        textView.font = NSFont.systemFont(ofSize: 12, weight: .regular)
+        textView.textColor = NSColor.labelColor
+        textView.backgroundColor = NSColor.textBackgroundColor
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isRichText = false
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.minSize = NSSize(width: 0, height: 0)
+        
+        // Configure text container for proper scrolling
+        if let textContainer = textView.textContainer {
+            textContainer.containerSize = NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+            textContainer.widthTracksTextView = true
+            textContainer.heightTracksTextView = false
+        }
+        
+        // Set up the text view frame to match scroll view content size
+        textView.frame = NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: scrollView.contentSize.height)
+        
+        // Set the document view and add to content view
+        scrollView.documentView = textView
+        contentView.addSubview(scrollView)
+        
+        // Force layout and ensure text is visible
+        textView.needsLayout = true
+        textView.layoutManager?.ensureLayout(for: textView.textContainer!)
+        
+        // Scroll to top to ensure text is visible
+        textView.scrollRangeToVisible(NSRange(location: 0, length: 0))
+        
+        // Create buttons
+        let buttonHeight: CGFloat = 32
+        let buttonWidth: CGFloat = 100
+        let buttonSpacing: CGFloat = 10
+        let buttonY: CGFloat = 20
+        
+        let agreeButton = NSButton(frame: NSRect(
+            x: windowRect.width - (buttonWidth * 2) - buttonSpacing - 20,
+            y: buttonY,
+            width: buttonWidth,
+            height: buttonHeight
+        ))
+        agreeButton.title = "I Agree"
+        agreeButton.bezelStyle = .rounded
+        agreeButton.target = self
+        agreeButton.action = #selector(agreeToFirstRunLicense(_:))
+        agreeButton.autoresizingMask = [.minXMargin, .maxYMargin]
+        contentView.addSubview(agreeButton)
+        
+        let quitButton = NSButton(frame: NSRect(
+            x: windowRect.width - buttonWidth - 20,
+            y: buttonY,
+            width: buttonWidth,
+            height: buttonHeight
+        ))
+        quitButton.title = "Quit"
+        quitButton.bezelStyle = .rounded
+        quitButton.target = self
+        quitButton.action = #selector(quitFromFirstRunLicense(_:))
+        quitButton.keyEquivalent = "\u{1b}" // Escape key
+        quitButton.autoresizingMask = [.minXMargin, .maxYMargin]
+        contentView.addSubview(quitButton)
+        
+        // Add instruction label
+        let instructionLabel = NSTextField(labelWithString: "Please read the complete license terms above, then click 'I Agree' to continue.")
+        instructionLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        instructionLabel.textColor = NSColor.labelColor
+        instructionLabel.frame = NSRect(x: 20, y: buttonY + 8, width: 400, height: 16)
+        instructionLabel.autoresizingMask = [.maxXMargin, .maxYMargin]
+        contentView.addSubview(instructionLabel)
+        
+        // Store the window and text for button actions
+        fullTextWindow = window
+        fullTextContent = text
+        
+        // Show window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    @objc private func agreeToFirstRunLicense(_ sender: NSButton) {
+        UserDefaults.standard.set(true, forKey: "HasShownLegalDisclaimer")
+        closeFullTextDialog(sender)
+    }
+    
+    @objc private func quitFromFirstRunLicense(_ sender: NSButton) {
+        NSApplication.shared.terminate(nil)
     }
     
     private func setupStatusItem() {
@@ -345,6 +519,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         aboutItem.target = self
         menu.addItem(aboutItem)
         
+        // Add license option
+        let licenseItem = NSMenuItem(title: "License", action: #selector(showLicense), keyEquivalent: "")
+        licenseItem.target = self
+        menu.addItem(licenseItem)
+        
         // Add quit option
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
@@ -548,39 +727,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         Copyright © 2024 ClipboardHistoryApp
         Licensed under MIT License with Additional Terms
-        
-        By using this software, you acknowledge reading and agreeing to the license terms and disclaimers.
         """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "View Full License")
-        
-        let response = alert.runModal()
-        if response == .alertSecondButtonReturn {
-            showLicenseDialog()
-        }
+        alert.runModal()
     }
     
-    private func showLicenseDialog() {
-        // Read license from bundle or show embedded version
+    @objc func showLicense() {
+        // Read the complete license text from the LICENSE file content
         let licenseText = """
 MIT License with Additional Terms
 
 Copyright (c) 2024 ClipboardHistoryApp
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
-ADDITIONAL DISCLAIMERS AND LIMITATIONS:
+================================================================================
+ADDITIONAL DISCLAIMERS AND LIMITATIONS
+================================================================================
 
 PRIVACY AND DATA HANDLING:
-- This software accesses clipboard data solely for clipboard history functionality
+- This software accesses clipboard data solely for the purpose of providing
+  clipboard history functionality
 - All clipboard data is stored locally on the user's device
 - No clipboard data is transmitted over networks or shared with third parties
-- Users are responsible for ensuring compliance with applicable privacy laws
+- Users are responsible for ensuring they comply with applicable privacy laws
+  and regulations when using this software
 
 SECURITY CONSIDERATIONS:
 - This software requires accessibility permissions to function
@@ -588,19 +776,146 @@ SECURITY CONSIDERATIONS:
 - The software does not encrypt stored clipboard data
 - Users are advised to regularly clear clipboard history if handling sensitive data
 
+SYSTEM COMPATIBILITY:
+- This software is designed for macOS systems
+- Compatibility with future macOS versions is not guaranteed
+- Users should test the software in their specific environment before relying on it
+
 LIMITATION OF LIABILITY:
-- The authors and contributors shall not be liable for any data loss, security breaches, or system damage resulting from the use of this software
+- The authors and contributors shall not be liable for any data loss, security
+  breaches, or system damage resulting from the use of this software
 - Users assume all risks associated with the use of this software
 - This software is provided for convenience and productivity purposes only
 
 COMPLIANCE:
-- Users are responsible for ensuring their use of this software complies with all applicable laws, regulations, and organizational policies
-- The software should not be used in environments where clipboard monitoring is prohibited or restricted
+- Users are responsible for ensuring their use of this software complies with
+  all applicable laws, regulations, and organizational policies
+- The software should not be used in environments where clipboard monitoring
+  is prohibited or restricted
 
-By using this software, you acknowledge that you have read, understood, and agree to be bound by these terms and disclaimers.
+By using this software, you acknowledge that you have read, understood, and
+agree to be bound by these terms and disclaimers.
 """
         
-        showFullTextDialog(for: licenseText)
+        showLicenseDialog(for: licenseText)
+    }
+    
+    private func showLicenseDialog(for text: String) {
+        // Close any existing full text window first
+        if let existingWindow = fullTextWindow {
+            existingWindow.close()
+            fullTextWindow = nil
+            fullTextContent = nil
+        }
+        
+        // Create a custom window for scrollable license display
+        let windowRect = NSRect(x: 0, y: 0, width: 700, height: 600)
+        let window = NSWindow(
+            contentRect: windowRect,
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        window.title = "License - ClipboardHistoryApp"
+        window.center()
+        window.minSize = NSSize(width: 500, height: 400)
+        window.delegate = self
+        window.isReleasedWhenClosed = false  // Prevent automatic release
+        
+        // Create main content view
+        let contentView = NSView(frame: windowRect)
+        window.contentView = contentView
+        
+        // Create scroll view for the text
+        let scrollView = NSScrollView(frame: NSRect(x: 20, y: 60, width: windowRect.width - 40, height: windowRect.height - 120))
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.autohidesScrollers = false
+        scrollView.borderType = .bezelBorder
+        scrollView.autoresizingMask = [.width, .height]
+        
+        // Create text view with proper setup for scrolling
+        let textView = NSTextView()
+        textView.string = text
+        textView.font = NSFont.systemFont(ofSize: 12, weight: .regular)
+        textView.textColor = NSColor.labelColor
+        textView.backgroundColor = NSColor.textBackgroundColor
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isRichText = false
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.minSize = NSSize(width: 0, height: 0)
+        
+        // Configure text container for proper scrolling
+        if let textContainer = textView.textContainer {
+            textContainer.containerSize = NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+            textContainer.widthTracksTextView = true
+            textContainer.heightTracksTextView = false
+        }
+        
+        // Set up the text view frame to match scroll view content size
+        textView.frame = NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: scrollView.contentSize.height)
+        
+        // Set the document view and add to content view
+        scrollView.documentView = textView
+        contentView.addSubview(scrollView)
+        
+        // Force layout and ensure text is visible
+        textView.needsLayout = true
+        textView.layoutManager?.ensureLayout(for: textView.textContainer!)
+        
+        // Scroll to top to ensure text is visible
+        textView.scrollRangeToVisible(NSRange(location: 0, length: 0))
+        
+        // Create close button
+        let buttonHeight: CGFloat = 32
+        let buttonWidth: CGFloat = 80
+        let buttonY: CGFloat = 20
+        
+        let closeButton = NSButton(frame: NSRect(
+            x: windowRect.width - buttonWidth - 20,
+            y: buttonY,
+            width: buttonWidth,
+            height: buttonHeight
+        ))
+        closeButton.title = "Close"
+        closeButton.bezelStyle = .rounded
+        closeButton.target = self
+        closeButton.action = #selector(closeFullTextDialog(_:))
+        closeButton.keyEquivalent = "\u{1b}" // Escape key
+        closeButton.autoresizingMask = [.minXMargin, .maxYMargin]
+        contentView.addSubview(closeButton)
+        
+        // Add character count label
+        let charCountLabel = NSTextField(labelWithString: "Characters: \(text.count)")
+        charCountLabel.font = NSFont.systemFont(ofSize: 11)
+        charCountLabel.textColor = NSColor.secondaryLabelColor
+        charCountLabel.frame = NSRect(x: 20, y: buttonY + 8, width: 200, height: 16)
+        charCountLabel.autoresizingMask = [.maxXMargin, .maxYMargin]
+        contentView.addSubview(charCountLabel)
+        
+        // Store the window and text for button actions
+        fullTextWindow = window
+        fullTextContent = text
+        
+        // Show window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+
+    
+    @objc func resetDisclaimer() {
+        UserDefaults.standard.removeObject(forKey: "HasShownLegalDisclaimer")
+        let alert = NSAlert()
+        alert.messageText = "Legal Disclaimer Reset"
+        alert.informativeText = "The legal disclaimer will be shown again on next app launch."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     @objc func quit() {
