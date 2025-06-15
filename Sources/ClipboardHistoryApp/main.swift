@@ -149,7 +149,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(hotkeyInfo)
         
         let copyInfo = NSMenuItem(
-            title: "Click items to copy, then paste with ⌘V",
+            title: "Click: copy • ⌘+click: view full • Right-click: options",
             action: nil,
             keyEquivalent: ""
         )

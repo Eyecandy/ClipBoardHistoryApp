@@ -22,8 +22,11 @@ class ClipboardItemView: NSView {
     }
     
     override func mouseDown(with event: NSEvent) {
-        if event.clickCount == 2 {
-            // Double-click to view full text
+        if event.modifierFlags.contains(.command) {
+            // Command+click to view full text
+            popup?.itemCommandClicked(at: index)
+        } else if event.clickCount == 2 {
+            // Double-click to view full text (keep as fallback)
             popup?.itemDoubleClicked(at: index)
         } else {
             // Single click to copy
@@ -98,6 +101,15 @@ public class ClipboardPopup: NSObject {
     }
     
     func itemDoubleClicked(at index: Int) {
+        guard index < clipboardItems.count else { 
+            return 
+        }
+        let selectedItem = clipboardItems[index]
+        delegate?.popupDidRequestFullView(selectedItem)
+        hide()
+    }
+    
+    func itemCommandClicked(at index: Int) {
         guard index < clipboardItems.count else { 
             return 
         }
@@ -383,7 +395,7 @@ public class ClipboardPopup: NSObject {
         containerView.addSubview(label)
         
         // Add click instruction
-        let instructionText = "Click: copy • Double-click: view full • Right-click: options"
+        let instructionText = "Click: copy • ⌘+click: view full • Right-click: options"
         let instructionLabel = NSTextField(labelWithString: instructionText)
         instructionLabel.font = NSFont.systemFont(ofSize: 9)
         instructionLabel.textColor = NSColor.secondaryLabelColor
