@@ -148,6 +148,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyInfo.isEnabled = false
         menu.addItem(hotkeyInfo)
         
+        let directHotkeyInfo = NSMenuItem(
+            title: "⌘⇧1-6: Copy items 1-6 directly",
+            action: nil,
+            keyEquivalent: ""
+        )
+        directHotkeyInfo.isEnabled = false
+        menu.addItem(directHotkeyInfo)
+        
         let copyInfo = NSMenuItem(
             title: "Click: copy • ⌘+click: view full • Right-click: options",
             action: nil,
@@ -181,12 +189,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func addHistoryItemToMenu(_ menu: NSMenu, item: String, index: Int) {
         // Clean up multi-line text for menu display
-        let menuTitle = item.cleanedForDisplay().truncated(to: 50)
+        let cleanedText = item.cleanedForDisplay().truncated(to: 45)
+        let menuTitle = "\(index + 1). \(cleanedText)"
+        // Add keyboard shortcut for first 6 items
+        let keyEquivalent = (index < 6) ? "\(index + 1)" : ""
         let menuItem = NSMenuItem(
             title: menuTitle,
             action: #selector(selectClipboardItem(_:)),
-            keyEquivalent: ""
+            keyEquivalent: keyEquivalent
         )
+        if index < 6 {
+            menuItem.keyEquivalentModifierMask = [.command, .shift]
+        }
         menuItem.tag = index
         menuItem.target = self
         
@@ -513,6 +527,20 @@ extension AppDelegate: ClipboardHistoryCore.HotkeyManagerDelegate {
     func quitHotkeyPressed() {
         DispatchQueue.main.async { [weak self] in
             self?.quit()
+        }
+    }
+    
+    func directHotkeyPressed(for index: Int) {
+        DispatchQueue.main.async { [weak self] in
+            guard let history = self?.clipboardManager?.getHistory(),
+                  index < history.count else {
+                print("⚠️ Direct hotkey pressed for index \(index + 1) but only \(self?.clipboardManager?.getHistory().count ?? 0) items available")
+                return
+            }
+            
+            let selectedItem = history[index]
+            print("🎯 Direct hotkey ⌘⇧\(index + 1) pressed - copying: \(selectedItem.prefix(50))...")
+            self?.clipboardManager?.copySelectedItem(selectedItem)
         }
     }
 }

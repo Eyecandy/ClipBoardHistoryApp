@@ -7,6 +7,7 @@ A modern macOS menu bar app that tracks your clipboard history and provides easy
 - 📋 **Tracks up to 20 recent clipboard items** with automatic persistence
 - 🔍 **Quick access via menu bar icon** with professional submenus for each item
 - ⚡ **Global hotkey support (⌘⇧C)** - Shows top items in a floating popup near your cursor
+- 🎯 **Direct item access (⌘⇧1-6)** - Copy clipboard items 1-6 instantly without popup
 - 🎛️ **Customizable popup size** - Configure 1-20 items to show in popup (default: 3)
 - 🖱️ **Multiple interaction methods:**
   - **Single click**: Copy item to clipboard
@@ -76,15 +77,24 @@ This script:
 5. Use "Clear History" to remove all tracked items
 6. Use "Quit" to exit the app (history is automatically saved)
 
-### Global Hotkey (⌘⇧C)
+### Global Hotkeys
+
+#### Quick Popup (⌘⇧C)
 1. Press **⌘⇧C** (Cmd+Shift+C) anywhere on your Mac
 2. A floating popup appears near your cursor showing the **most recent** clipboard items
 3. **Interaction methods:**
    - **Click**: Copy item to clipboard
-   - **Double-click**: View full text content
+   - **⌘+Click**: View full text content
    - **Right-click**: Show context menu with copy, view, and delete options
-4. The popup automatically disappears after 5 seconds or when you interact with it
+4. The popup automatically disappears after 10 seconds or when you interact with it
 5. Hover over items to see them highlighted
+
+#### Direct Item Access (⌘⇧1-6)
+1. Press **⌘⇧1** through **⌘⇧6** anywhere on your Mac
+2. **Instantly copies** the corresponding clipboard item (1st, 2nd, 3rd, etc.)
+3. **No popup needed** - immediate clipboard access for maximum speed
+4. Only works if the item exists (e.g., ⌘⇧3 only works if you have 3+ items)
+5. Perfect for frequently accessed items
 
 ### Settings & Customization
 1. **Popup Item Count**: Access via menu bar → Settings → Popup Items

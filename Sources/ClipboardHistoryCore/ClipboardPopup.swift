@@ -15,10 +15,24 @@ class ClipboardItemView: NSView {
     override func mouseEntered(with event: NSEvent) {
         wantsLayer = true
         layer?.backgroundColor = NSColor.selectedControlColor.withAlphaComponent(0.3).cgColor
+        
+        // Notify popup that mouse is inside
+        popup?.mouseEnteredPopup()
     }
     
     override func mouseExited(with event: NSEvent) {
         layer?.backgroundColor = NSColor.clear.cgColor
+        
+        // Check if mouse is still within popup bounds
+        if let popup = popup, let window = popup.window {
+            let mouseLocation = NSEvent.mouseLocation
+            let windowFrame = window.frame
+            let isStillInside = windowFrame.contains(mouseLocation)
+            
+            if !isStillInside {
+                popup.mouseExitedPopup()
+            }
+        }
     }
     
     override func mouseDown(with event: NSEvent) {
@@ -57,9 +71,12 @@ class ClipboardItemView: NSView {
 
 public class ClipboardPopup: NSObject {
     public weak var delegate: ClipboardPopupDelegate?
-    private var window: NSWindow?
+    private(set) var window: NSWindow?
     private var clipboardItems: [String] = []
     private var eventMonitor: Any?
+    private var previousActiveApp: NSRunningApplication?
+    private var autoHideTimer: Timer?
+    private var isMouseInside = false
     
     public override init() {
         super.init()
@@ -67,6 +84,9 @@ public class ClipboardPopup: NSObject {
     
     public func show(with items: [String], maxItems: Int = 3) {
         hide() // Hide any existing popup
+        
+        // Capture the currently active app before showing popup
+        previousActiveApp = NSWorkspace.shared.frontmostApplication
         
         let validatedMaxItems = max(1, min(20, maxItems))
         clipboardItems = Array(items.prefix(validatedMaxItems))
@@ -83,8 +103,29 @@ public class ClipboardPopup: NSObject {
             NSEvent.removeMonitor(eventMonitor)
             self.eventMonitor = nil
         }
+        
+        // Cancel auto-hide timer
+        autoHideTimer?.invalidate()
+        autoHideTimer = nil
+        
         window?.orderOut(nil)
         window = nil
+        
+        // Clear the previous app reference when hiding without selection
+        previousActiveApp = nil
+        isMouseInside = false
+    }
+    
+    private func restorePreviousAppFocus() {
+        // Restore focus to the previous app after a short delay to ensure clipboard operation completes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            if let previousApp = self?.previousActiveApp,
+               previousApp.isTerminated == false {
+                // Use activateWithOptions for better focus restoration
+                previousApp.activate(options: [.activateIgnoringOtherApps])
+            }
+            self?.previousActiveApp = nil
+        }
     }
     
     public func isVisible() -> Bool {
@@ -98,6 +139,9 @@ public class ClipboardPopup: NSObject {
         let selectedItem = clipboardItems[index]
         delegate?.popupDidSelectItem(selectedItem)
         hide()
+        
+        // Restore focus to the previous app after a short delay
+        restorePreviousAppFocus()
     }
     
     func itemDoubleClicked(at index: Int) {
@@ -157,6 +201,9 @@ public class ClipboardPopup: NSObject {
         if let item = sender.representedObject as? String {
             delegate?.popupDidSelectItem(item)
             hide()
+            
+            // Restore focus to the previous app after a short delay
+            restorePreviousAppFocus()
         }
     }
     
@@ -334,18 +381,46 @@ public class ClipboardPopup: NSObject {
     private func showAndConfigureWindow() {
         guard let window = window else { return }
         
-        // Show window
-        window.makeKeyAndOrderFront(nil)
+        // Show window without stealing focus - use orderFront instead of makeKeyAndOrderFront
+        window.orderFront(nil)
         
-        // Auto-hide after 10 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) { [weak self] in
-            self?.hide()
-        }
+        // Start auto-hide timer (will be managed by mouse tracking)
+        startAutoHideTimer()
         
         // Hide when clicking outside
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             self?.hide()
         }
+    }
+    
+    private func startAutoHideTimer() {
+        autoHideTimer?.invalidate()
+        autoHideTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] _ in
+            if self?.isMouseInside == false {
+                self?.hide()
+            }
+        }
+    }
+    
+    private func pauseAutoHideTimer() {
+        autoHideTimer?.invalidate()
+        autoHideTimer = nil
+    }
+    
+    private func resumeAutoHideTimer() {
+        if autoHideTimer == nil && !isMouseInside {
+            startAutoHideTimer()
+        }
+    }
+    
+    func mouseEnteredPopup() {
+        isMouseInside = true
+        pauseAutoHideTimer()
+    }
+    
+    func mouseExitedPopup() {
+        isMouseInside = false
+        resumeAutoHideTimer()
     }
     
     private func createItemView(item: String, index: Int, frame: NSRect) -> ClipboardItemView {
@@ -382,24 +457,37 @@ public class ClipboardPopup: NSObject {
     
     private func addLabelsToContainer(_ containerView: ClipboardItemView, item: String, frame: NSRect) {
         // Clean up text for display - replace newlines with spaces and truncate
-        let displayText = item.cleanedForDisplay().truncated(to: 60)
+        let displayText = item.cleanedForDisplay().truncated(to: 50) // Reduced to make room for index
         
-        // Create label
+        // Create index label (1, 2, 3, etc.)
+        let indexLabel = NSTextField(labelWithString: "\(containerView.index + 1)")
+        indexLabel.font = NSFont.boldSystemFont(ofSize: 16)
+        indexLabel.textColor = NSColor.systemBlue
+        indexLabel.backgroundColor = NSColor.clear
+        indexLabel.frame = NSRect(x: 8, y: 25, width: 25, height: 20)
+        indexLabel.alignment = .center
+        indexLabel.isBordered = false
+        containerView.addSubview(indexLabel)
+        
+        // Create text label (adjusted for index)
         let label = NSTextField(labelWithString: displayText)
         label.font = NSFont.systemFont(ofSize: 13)
         label.textColor = NSColor.labelColor
-        label.frame = NSRect(x: 15, y: 25, width: frame.width - 30, height: 20)
+        label.frame = NSRect(x: 35, y: 25, width: frame.width - 45, height: 20)
         label.lineBreakMode = .byTruncatingTail
         label.backgroundColor = NSColor.clear
         label.isBordered = false
         containerView.addSubview(label)
         
-        // Add click instruction
-        let instructionText = "Click: copy • ⌘+click: view full • Right-click: options"
+        // Add click instruction with dynamic hotkey info
+        let maxHotkeyIndex = min(containerView.index + 1, 6)
+        let instructionText = containerView.index < 6 ? 
+            "Click: copy • ⌘+click: view full • ⌘⇧\(containerView.index + 1): direct copy" :
+            "Click: copy • ⌘+click: view full • Right-click: options"
         let instructionLabel = NSTextField(labelWithString: instructionText)
         instructionLabel.font = NSFont.systemFont(ofSize: 9)
         instructionLabel.textColor = NSColor.secondaryLabelColor
-        instructionLabel.frame = NSRect(x: 15, y: 5, width: frame.width - 30, height: 12)
+        instructionLabel.frame = NSRect(x: 35, y: 5, width: frame.width - 45, height: 12)
         instructionLabel.backgroundColor = NSColor.clear
         instructionLabel.isBordered = false
         containerView.addSubview(instructionLabel)
