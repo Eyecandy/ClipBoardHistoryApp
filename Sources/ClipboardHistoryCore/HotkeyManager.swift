@@ -5,14 +5,14 @@ import Carbon
 public protocol HotkeyManagerDelegate: AnyObject {
     func hotkeyPressed()
     func quitHotkeyPressed()
-    func directHotkeyPressed(for index: Int) // For ⌘⇧1-6
+    func directHotkeyPressed(for index: Int) // For ⌘⌥1-6
 }
 
 public class HotkeyManager {
     public weak var delegate: HotkeyManagerDelegate?
     private var hotKeyRef: EventHotKeyRef?
     private var quitHotKeyRef: EventHotKeyRef?
-    private var directHotKeyRefs: [EventHotKeyRef?] = Array(repeating: nil, count: 6) // For ⌘⇧1-6
+    private var directHotKeyRefs: [EventHotKeyRef?] = Array(repeating: nil, count: 6) // For ⌘⌥1-6
     private var eventHandler: EventHandlerRef?
     
     public init() {}
@@ -41,7 +41,7 @@ public class HotkeyManager {
                         } else if hotKeyID.id == 2 {
                             manager.delegate?.quitHotkeyPressed()
                         } else if hotKeyID.id >= 10 && hotKeyID.id <= 15 {
-                            // Direct hotkeys for clipboard items 1-6 (IDs 10-15)
+                            // Direct hotkeys for clipboard items 1-6 (IDs 10-15) using ⌘⌥1-6
                             let index = Int(hotKeyID.id) - 10
                             manager.delegate?.directHotkeyPressed(for: index)
                         }
@@ -80,7 +80,7 @@ public class HotkeyManager {
             print("❌ Failed to register hotkey: \(registerStatus)")
         }
         
-        // Register direct hotkeys for clipboard items 1-6 (⌘⇧1-6)
+        // Register direct hotkeys for clipboard items 1-6 (⌘⌥1-6)
         registerDirectHotkeys()
         
         // TODO: Re-enable quit hotkey after fixing crash
@@ -90,7 +90,7 @@ public class HotkeyManager {
     private func registerDirectHotkeys() {
         // Key codes for numbers 1-6
         let keyCodes: [UInt32] = [18, 19, 20, 21, 23, 22] // 1, 2, 3, 4, 5, 6
-        let modifiers = UInt32(cmdKey | shiftKey)
+        let modifiers = UInt32(cmdKey | optionKey)
         
         for i in 0..<6 {
             let hotKeyID = EventHotKeyID(signature: fourCharCode("CBHK"), id: UInt32(10 + i)) // IDs 10-15
@@ -108,9 +108,9 @@ public class HotkeyManager {
             
             if registerStatus == noErr {
                 directHotKeyRefs[i] = hotKeyRef
-                print("✅ Direct hotkey ⌘⇧\(i + 1) registered")
+                print("✅ Direct hotkey ⌘⌥\(i + 1) registered")
             } else {
-                print("❌ Failed to register direct hotkey ⌘⇧\(i + 1): \(registerStatus)")
+                print("❌ Failed to register direct hotkey ⌘⌥\(i + 1): \(registerStatus)")
             }
         }
     }

@@ -265,9 +265,9 @@ final class ClipboardManagerTests: XCTestCase {
         XCTAssertEqual(history.count, 3, "Should have exactly 3 items")
         
         // Direct hotkeys 1-3 should work, 4-6 should be gracefully handled
-        XCTAssertEqual(history[0], "Third item", "⌘⇧1 should access first item")
-        XCTAssertEqual(history[1], "Second item", "⌘⇧2 should access second item")
-        XCTAssertEqual(history[2], "Only item", "⌘⇧3 should access third item")
+        XCTAssertEqual(history[0], "Third item", "⌘⌥1 should access first item")
+        XCTAssertEqual(history[1], "Second item", "⌘⌥2 should access second item")
+        XCTAssertEqual(history[2], "Only item", "⌘⌥3 should access third item")
         
         // Indices 3-5 would be out of bounds - this tests the safety of direct hotkey implementation
         XCTAssertTrue(history.count < 6, "Should have fewer than 6 items to test boundary conditions")
@@ -288,7 +288,7 @@ final class ClipboardManagerTests: XCTestCase {
         
         // All 6 direct hotkeys should have valid targets
         for i in 0..<6 {
-            XCTAssertTrue(i < history.count, "Index \(i) should be valid for direct hotkey ⌘⇧\(i + 1)")
+            XCTAssertTrue(i < history.count, "Index \(i) should be valid for direct hotkey ⌘⌥\(i + 1)")
         }
     }
 }

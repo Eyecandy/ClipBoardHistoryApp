@@ -381,7 +381,7 @@ agree to be bound by these terms and disclaimers.
         menu.addItem(hotkeyInfo)
         
         let directHotkeyInfo = NSMenuItem(
-            title: "⌘⇧1-6: Copy items 1-6 directly",
+            title: "⌘⌥1-6: Copy items 1-6 directly",
             action: nil,
             keyEquivalent: ""
         )
@@ -431,7 +431,7 @@ agree to be bound by these terms and disclaimers.
             keyEquivalent: keyEquivalent
         )
         if index < 6 {
-            menuItem.keyEquivalentModifierMask = [.command, .shift]
+            menuItem.keyEquivalentModifierMask = [.command, .option]
         }
         menuItem.tag = index
         menuItem.target = self
@@ -489,15 +489,15 @@ agree to be bound by these terms and disclaimers.
         let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
         let settingsSubmenu = NSMenu()
         
-        // Add popup item count setting
-        let popupSettingsItem = NSMenuItem(title: "Popup Items", action: nil, keyEquivalent: "")
+        // Add popup item count setting with clearer description
+        let popupSettingsItem = NSMenuItem(title: "⌘⇧C Popup Items", action: nil, keyEquivalent: "")
         let popupSubmenu = NSMenu()
         
         let currentCount = clipboardManager?.getPopupItemCount() ?? 3
         
         for count in 1...20 {
             let countItem = NSMenuItem(
-                title: "\(count) item\(count == 1 ? "" : "s")",
+                title: "\(count) item\(count == 1 ? "" : "s") in ⌘⇧C popup",
                 action: #selector(setPopupItemCount(_:)),
                 keyEquivalent: ""
             )
@@ -513,6 +513,11 @@ agree to be bound by these terms and disclaimers.
         settingsItem.submenu = settingsSubmenu
         menu.addItem(settingsItem)
         menu.addItem(NSMenuItem.separator())
+        
+        // Add user manual option
+        let manualItem = NSMenuItem(title: "User Manual", action: #selector(showUserManual), keyEquivalent: "")
+        manualItem.target = self
+        menu.addItem(manualItem)
         
         // Add about/license option
         let aboutItem = NSMenuItem(title: "About ClipboardHistoryApp", action: #selector(showAbout), keyEquivalent: "")
@@ -906,7 +911,161 @@ agree to be bound by these terms and disclaimers.
         NSApp.activate(ignoringOtherApps: true)
     }
     
+    @objc func showUserManual() {
+        let manualText = """
+ClipboardHistoryApp - User Manual
 
+🚀 QUICK START
+After launching, you'll see a clipboard icon in your menu bar.
+The app automatically tracks everything you copy (up to 20 items).
+
+⌨️ GLOBAL HOTKEYS (Your Main Interface)
+
+🎯 ⌘⇧C - Quick Popup
+• Shows floating popup with recent clipboard items
+• Click to copy, ⌘+Click to view full text, Right-click for options
+• Auto-hides after 10 seconds (pauses when mouse hovers)
+
+🎯 ⌘⌥1-6 - Direct Access
+• ⌘⌥1: Copy most recent item instantly
+• ⌘⌥2: Copy 2nd most recent item
+• ⌘⌥3-6: Copy 3rd-6th items
+• Silent operation - no popup, maximum speed
+
+📋 MENU BAR ACCESS
+Click the clipboard icon to:
+• View all history items (numbered 1, 2, 3...) with ⌘⌥1, ⌘⌥2, ⌘⌥3, etc.
+• Access settings: ⌘⇧C Popup Items (1-20 items)
+• Clear history or delete individual items
+
+🔧 KEY FEATURES
+• Focus Preservation: Returns to your original app after selection
+• Copy-Only Workflow: Select item → it's copied → paste with ⌘V
+• Persistent History: Items saved between app sessions
+• Smart Text Handling: Full content preserved, truncated for display
+
+💡 WORKFLOW TIPS
+• Use ⌘⌥1-6 for frequently accessed items
+• Use ⌘⇧C popup when you need to see and choose
+• Use ⌘+Click to preview long text before copying
+• Adjust popup item count in Settings to match your needs
+
+🔒 PRIVACY
+• All data stored locally on your device
+• No network transmission or cloud storage
+• Clear history regularly if handling sensitive data
+
+For more info: About ClipboardHistoryApp • License
+"""
+        
+        showUserManualDialog(for: manualText)
+    }
+    
+    private func showUserManualDialog(for text: String) {
+        // Close any existing full text window first
+        if let existingWindow = fullTextWindow {
+            existingWindow.close()
+            fullTextWindow = nil
+            fullTextContent = nil
+        }
+        
+        // Create a custom window for scrollable manual display
+        let windowRect = NSRect(x: 0, y: 0, width: 650, height: 500)
+        let window = NSWindow(
+            contentRect: windowRect,
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        window.title = "User Manual - ClipboardHistoryApp"
+        window.center()
+        window.minSize = NSSize(width: 500, height: 400)
+        window.delegate = self
+        window.isReleasedWhenClosed = false  // Prevent automatic release
+        
+        // Create main content view
+        let contentView = NSView(frame: windowRect)
+        window.contentView = contentView
+        
+        // Create scroll view for the text
+        let scrollView = NSScrollView(frame: NSRect(x: 20, y: 60, width: windowRect.width - 40, height: windowRect.height - 120))
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.autohidesScrollers = false
+        scrollView.borderType = .bezelBorder
+        scrollView.autoresizingMask = [.width, .height]
+        
+        // Create text view with proper setup for scrolling
+        let textView = NSTextView()
+        textView.string = text
+        textView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        textView.textColor = NSColor.labelColor
+        textView.backgroundColor = NSColor.textBackgroundColor
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isRichText = false
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.minSize = NSSize(width: 0, height: 0)
+        
+        // Configure text container for proper scrolling
+        if let textContainer = textView.textContainer {
+            textContainer.containerSize = NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+            textContainer.widthTracksTextView = true
+            textContainer.heightTracksTextView = false
+        }
+        
+        // Set up the text view frame to match scroll view content size
+        textView.frame = NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: scrollView.contentSize.height)
+        
+        // Set the document view and add to content view
+        scrollView.documentView = textView
+        contentView.addSubview(scrollView)
+        
+        // Force layout and ensure text is visible
+        textView.needsLayout = true
+        textView.layoutManager?.ensureLayout(for: textView.textContainer!)
+        
+        // Scroll to top to ensure text is visible
+        textView.scrollRangeToVisible(NSRange(location: 0, length: 0))
+        
+        // Create close button
+        let buttonHeight: CGFloat = 32
+        let buttonWidth: CGFloat = 80
+        let buttonY: CGFloat = 20
+        
+        let closeButton = NSButton(frame: NSRect(
+            x: windowRect.width - buttonWidth - 20,
+            y: buttonY,
+            width: buttonWidth,
+            height: buttonHeight
+        ))
+        closeButton.title = "Close"
+        closeButton.bezelStyle = .rounded
+        closeButton.target = self
+        closeButton.action = #selector(closeFullTextDialog(_:))
+        closeButton.keyEquivalent = "\u{1b}" // Escape key
+        closeButton.autoresizingMask = [.minXMargin, .maxYMargin]
+        contentView.addSubview(closeButton)
+        
+        // Add character count label
+        let charCountLabel = NSTextField(labelWithString: "User Manual - \(text.count) characters")
+        charCountLabel.font = NSFont.systemFont(ofSize: 11)
+        charCountLabel.textColor = NSColor.secondaryLabelColor
+        charCountLabel.frame = NSRect(x: 20, y: buttonY + 8, width: 300, height: 16)
+        charCountLabel.autoresizingMask = [.maxXMargin, .maxYMargin]
+        contentView.addSubview(charCountLabel)
+        
+        // Store the window and text for button actions
+        fullTextWindow = window
+        fullTextContent = text
+        
+        // Show window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
     
     @objc func resetDisclaimer() {
         UserDefaults.standard.removeObject(forKey: "HasShownLegalDisclaimer")

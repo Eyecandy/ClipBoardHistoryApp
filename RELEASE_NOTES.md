@@ -1,14 +1,14 @@
 # Clipboard History App - Release Notes
 
-## Version 1.0 - Production Ready Release
+## Version alpha 0.0.1 - Alpha Release
 
 ### 🎯 Major Features
 
-#### Direct Hotkey Access (⌘⇧1-6)
-- **Instant Item Access**: Press ⌘⇧1 through ⌘⇧6 to copy items directly
+#### Direct Hotkey Access (⌘⌥1-6)
+- **Instant Item Access**: Press ⌘⌥1 through ⌘⌥6 to copy items directly
 - **No Popup Needed**: Maximum speed for frequently used items
 - **Visual Indices**: All items now show numbers (1, 2, 3, etc.) for easy identification
-- **Menu Shortcuts**: First 6 menu items show ⌘⇧1-6 keyboard shortcuts
+- **Menu Shortcuts**: First 6 menu items show ⌘⌥1-6 keyboard shortcuts
 - **Silent Operation**: Secure clipboard access without visual feedback
 - **Boundary Safety**: Graceful handling when fewer than 6 items exist
 

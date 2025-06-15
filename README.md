@@ -80,7 +80,7 @@ This script:
 1. After launching, you'll see a clipboard icon in your menu bar
 2. Copy any text to your clipboard - it will be automatically tracked and saved
 3. Click the menu bar icon to see your clipboard history with numbered items
-4. **First 6 items show ⌘⇧1-6 shortcuts** for direct access
+4. **First 6 items show ⌘⌥1-6 shortcuts** for direct access
 5. Each clipboard item has three options:
    - **Copy**: Copy the item back to your clipboard
    - **View Full Text**: See the complete content in a resizable window
@@ -100,13 +100,13 @@ This script:
    - **Right-click**: Show context menu with copy, view, and delete options
 4. The popup automatically hides after 10 seconds
 5. **Smart behavior**: Pauses auto-hide when mouse hovers over items
-6. Shows specific hotkey for each item (e.g., "⌘⇧1: direct copy")
+6. Shows specific hotkey for each item (e.g., "⌘⌥1: direct copy")
 
-#### Direct Item Access (⌘⇧1-6)
-1. Press **⌘⇧1** through **⌘⇧6** anywhere on your Mac
+#### Direct Item Access (⌘⌥1-6)
+1. Press **⌘⌥1** through **⌘⌥6** anywhere on your Mac
 2. **Instantly copies** the corresponding clipboard item (1st, 2nd, 3rd, etc.)
 3. **No popup needed** - immediate clipboard access for maximum speed
-4. Only works if the item exists (e.g., ⌘⇧3 only works if you have 3+ items)
+4. Only works if the item exists (e.g., ⌘⌥3 only works if you have 3+ items)
 5. Perfect for frequently accessed items
 6. **Silent operation** - no visual feedback for security
 

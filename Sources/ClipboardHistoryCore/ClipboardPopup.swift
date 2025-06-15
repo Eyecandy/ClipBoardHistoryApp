@@ -481,7 +481,7 @@ public class ClipboardPopup: NSObject {
         
         // Add click instruction with dynamic hotkey info
         let instructionText = containerView.index < 6 ? 
-            "Click: copy • ⌘+click: view full • ⌘⇧\(containerView.index + 1): direct copy" :
+            "Click: copy • ⌘+click: view full • ⌘⌥\(containerView.index + 1): direct copy" :
             "Click: copy • ⌘+click: view full • Right-click: options"
         let instructionLabel = NSTextField(labelWithString: instructionText)
         instructionLabel.font = NSFont.systemFont(ofSize: 9)
