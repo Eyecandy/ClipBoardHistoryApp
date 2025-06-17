@@ -24,7 +24,7 @@ class ClipboardItemView: NSView {
             layer?.backgroundColor = NSColor.selectedControlColor.withAlphaComponent(0.3).cgColor
         }
         
-        // Select item on hover (ready for Cmd+V paste)
+        // Select item on hover (ready for Enter paste)
         popup?.itemHovered(at: index)
         
         // Notify popup that mouse is inside
@@ -37,6 +37,9 @@ class ClipboardItemView: NSView {
         } else {
             layer?.backgroundColor = NSColor.clear.cgColor
         }
+        
+        // Clear hovered item when mouse exits
+        popup?.itemUnhovered()
         
         // Check if mouse is still within popup bounds
         if let popup = popup, let window = popup.window {
@@ -53,10 +56,36 @@ class ClipboardItemView: NSView {
 
     
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 36 { // Enter key
-            popup?.itemEnterPressed(at: index)
-        } else {
+        switch event.keyCode {
+        case 18...26, 28: // Number keys 1-9 (18=1, 19=2, 20=3, 21=4, 23=5, 22=6, 26=7, 28=8, 25=9)
+            let numberKeyPressed = getNumberFromKeyCode(event.keyCode)
+            if let number = numberKeyPressed, number >= 1 && number <= 9 {
+                let targetIndex = number - 1
+                popup?.itemNumberKeyPressed(at: targetIndex)
+            }
+        case 126: // Up arrow
+            popup?.navigateUp(from: index)
+        case 125: // Down arrow
+            popup?.navigateDown(from: index)
+        case 53: // Escape key
+            popup?.hide()
+        default:
             super.keyDown(with: event)
+        }
+    }
+    
+    private func getNumberFromKeyCode(_ keyCode: UInt16) -> Int? {
+        switch keyCode {
+        case 18: return 1
+        case 19: return 2
+        case 20: return 3
+        case 21: return 4
+        case 23: return 5
+        case 22: return 6
+        case 26: return 7
+        case 28: return 8
+        case 25: return 9
+        default: return nil
         }
     }
     
@@ -68,8 +97,8 @@ class ClipboardItemView: NSView {
             // Double-click to view full text (keep as fallback)
             popup?.itemDoubleClicked(at: index)
         } else {
-            // Single click to copy only
-            popup?.itemClicked(at: index)
+            // Single click to paste immediately (changed from copy-only)
+            popup?.itemClickedForPaste(at: index)
         }
     }
     
@@ -109,6 +138,7 @@ public class ClipboardPopup: NSObject {
     private var autoHideTimer: Timer?
     private var isMouseInside = false
     private var currentTimeout: Int = 10
+    private var hoveredItemIndex: Int? = nil
     
     public override init() {
         super.init()
@@ -185,32 +215,67 @@ public class ClipboardPopup: NSObject {
             return 
         }
         let selectedItem = clipboardItems[index]
-        delegate?.popupDidRequestPaste(selectedItem)
+        
+        // Store previous app before hiding
+        let previousApp = self.previousActiveApp
+        
+        // Hide popup completely first
         hide()
         
-        // Restore focus immediately for paste operation
-        restorePreviousAppFocus()
+        // Ensure window is fully dismissed and focus restored
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { [weak self] in
+            // Activate previous app to restore cursor/focus
+            if let previousApp = previousApp,
+               previousApp.isTerminated == false {
+                previousApp.activate(options: [.activateIgnoringOtherApps])
+                
+                // Wait for focus to fully settle (cursor should reappear)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    self?.delegate?.popupDidRequestPaste(selectedItem)
+                }
+            }
+        }
     }
     
     func itemHovered(at index: Int) {
         guard index < clipboardItems.count else { 
             return 
         }
+        hoveredItemIndex = index
         let selectedItem = clipboardItems[index]
-        // Just copy to clipboard on hover - user can paste with Cmd+V
+        // Copy to clipboard on hover - user can click to paste
         delegate?.popupDidSelectItem(selectedItem)
     }
     
-    func itemEnterPressed(at index: Int) {
+    func itemUnhovered() {
+        hoveredItemIndex = nil
+    }
+    
+    func itemNumberKeyPressed(at index: Int) {
         guard index < clipboardItems.count else { 
             return 
         }
         let selectedItem = clipboardItems[index]
-        delegate?.popupDidRequestPaste(selectedItem)
+        
+        // Store previous app before hiding
+        let previousApp = self.previousActiveApp
+        
+        // Hide popup completely first
         hide()
         
-        // Restore focus immediately for paste operation
-        restorePreviousAppFocus()
+        // Ensure window is fully dismissed and focus restored
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { [weak self] in
+            // Activate previous app to restore cursor/focus
+            if let previousApp = previousApp,
+               previousApp.isTerminated == false {
+                previousApp.activate(options: [.activateIgnoringOtherApps])
+                
+                // Wait for focus to fully settle (cursor should reappear)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    self?.delegate?.popupDidRequestPaste(selectedItem)
+                }
+            }
+        }
     }
     
     func itemDoubleClicked(at index: Int) {
@@ -237,6 +302,83 @@ public class ClipboardPopup: NSObject {
         }
         let selectedItem = clipboardItems[index]
         showContextMenu(for: selectedItem, at: index, event: event)
+    }
+    
+    func navigateUp(from currentIndex: Int) {
+        let targetIndex = max(0, currentIndex - 1)
+        setFirstResponder(to: targetIndex)
+    }
+    
+    func navigateDown(from currentIndex: Int) {
+        let targetIndex = min(clipboardItems.count - 1, currentIndex + 1)
+        setFirstResponder(to: targetIndex)
+    }
+    
+    private func setFirstResponder(to index: Int) {
+        guard let window = window else { return }
+        
+        // Clear existing highlights first
+        clearAllHighlights()
+        
+        // Find and focus the item view at the specified index
+        if let contentView = window.contentView {
+            // Check direct subviews first
+            for subview in contentView.subviews {
+                if let itemView = subview as? ClipboardItemView, itemView.index == index {
+                    window.makeFirstResponder(itemView)
+                    highlightItemView(itemView)
+                    return
+                }
+                // Also check scroll view content
+                if let scrollView = subview as? NSScrollView,
+                   let documentView = scrollView.documentView {
+                    for docSubview in documentView.subviews {
+                        if let itemView = docSubview as? ClipboardItemView, itemView.index == index {
+                            window.makeFirstResponder(itemView)
+                            highlightItemView(itemView)
+                            
+                            // Auto-scroll to keep the focused item visible
+                            let itemFrame = itemView.frame
+                            scrollView.contentView.scrollToVisible(itemFrame)
+                            return
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func clearAllHighlights() {
+        guard let window = window, let contentView = window.contentView else { return }
+        
+        // Clear highlights from all item views
+        for subview in contentView.subviews {
+            if let itemView = subview as? ClipboardItemView {
+                clearHighlight(from: itemView)
+            }
+            // Also check scroll view content
+            if let scrollView = subview as? NSScrollView,
+               let documentView = scrollView.documentView {
+                for docSubview in documentView.subviews {
+                    if let itemView = docSubview as? ClipboardItemView {
+                        clearHighlight(from: itemView)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func highlightItemView(_ itemView: ClipboardItemView) {
+        itemView.wantsLayer = true
+        itemView.layer?.backgroundColor = NSColor.selectedControlColor.withAlphaComponent(0.3).cgColor
+        itemView.layer?.borderColor = NSColor.controlAccentColor.cgColor
+        itemView.layer?.borderWidth = 2.0
+    }
+    
+    private func clearHighlight(from itemView: ClipboardItemView) {
+        itemView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        itemView.layer?.borderColor = NSColor.separatorColor.cgColor
+        itemView.layer?.borderWidth = 0.5
     }
     
     private func showContextMenu(for item: String, at index: Int, event: NSEvent) {
@@ -489,15 +631,40 @@ public class ClipboardPopup: NSObject {
     private func showAndConfigureWindow(timeout: Int) {
         guard let window = window else { return }
         
-        // Show window without stealing focus - use orderFront instead of makeKeyAndOrderFront
-        window.orderFront(nil)
+        // Show window and make it key to receive keyboard events
+        window.makeKeyAndOrderFront(nil)
+        
+        // Set the first item view as first responder to enable keyboard navigation
+        if let contentView = window.contentView {
+            // Find the first ClipboardItemView and make it the first responder
+            for subview in contentView.subviews {
+                if let itemView = subview as? ClipboardItemView {
+                    window.makeFirstResponder(itemView)
+                    break
+                }
+                // Also check scroll view content
+                if let scrollView = subview as? NSScrollView,
+                   let documentView = scrollView.documentView {
+                    for docSubview in documentView.subviews {
+                        if let itemView = docSubview as? ClipboardItemView {
+                            window.makeFirstResponder(itemView)
+                            break
+                        }
+                    }
+                }
+            }
+        }
         
         // Start auto-hide timer with configurable timeout (will be managed by mouse tracking)
         startAutoHideTimer(timeout: timeout)
         
-        // Hide when clicking outside
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.hide()
+        // Hide when clicking outside or pressing Escape
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
+            if event.type == .keyDown && event.keyCode == 53 { // Escape key
+                self?.hide()
+            } else if event.type == .leftMouseDown || event.type == .rightMouseDown {
+                self?.hide()
+            }
         }
     }
     
@@ -607,8 +774,8 @@ public class ClipboardPopup: NSObject {
         
         // Add click instruction with dynamic hotkey info
         let instructionText = containerView.index < 9 ? 
-            "Click: copy • Hover+⌘V: paste • ⌘⌥\(containerView.index + 1): paste instantly" :
-            "Click: copy • Hover+⌘V: paste • ⌘+click/right-click: full text"
+            "Click: paste • Hover: copy • \(containerView.index + 1): paste • ⌘⌥\(containerView.index + 1): instant • ↑/↓: navigate" :
+            "Click: paste • Hover: copy • ↑/↓: navigate • ⌘+click: full text"
         let instructionLabel = NSTextField(labelWithString: instructionText)
         instructionLabel.font = NSFont.systemFont(ofSize: 9)
         instructionLabel.textColor = NSColor.secondaryLabelColor

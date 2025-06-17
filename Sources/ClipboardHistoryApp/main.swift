@@ -415,7 +415,7 @@ agree to be bound by these terms and disclaimers.
         menu.addItem(directHotkeyInfo)
         
         let copyInfo = NSMenuItem(
-            title: "Click: copy • Hover+⌘V: paste • ⌘⌥1-9: instant paste",
+            title: "Click: paste • Hover: copy • 1-9: paste • ⌘⌥1-9: instant",
             action: nil,
             keyEquivalent: ""
         )
