@@ -24,7 +24,7 @@ final class HotkeySettingsTests: XCTestCase {
     func testDefaultConfigurations() {
         let configs = hotkeySettings.getAllConfigs()
         
-        XCTAssertEqual(configs.count, 8, "Should have 8 default hotkey configurations")
+        XCTAssertEqual(configs.count, 11, "Should have 11 default hotkey configurations")
         
         // Check if all expected configs exist
         let configIds = configs.map { $0.id }
@@ -36,6 +36,9 @@ final class HotkeySettingsTests: XCTestCase {
         XCTAssertTrue(configIds.contains("directCopy4"))
         XCTAssertTrue(configIds.contains("directCopy5"))
         XCTAssertTrue(configIds.contains("directCopy6"))
+        XCTAssertTrue(configIds.contains("directCopy7"))
+        XCTAssertTrue(configIds.contains("directCopy8"))
+        XCTAssertTrue(configIds.contains("directCopy9"))
     }
     
     func testShowHistoryDefaultConfig() {
@@ -65,7 +68,7 @@ final class HotkeySettingsTests: XCTestCase {
     }
     
     func testDirectCopyConfigs() {
-        for i in 1...6 {
+        for i in 1...9 {
             guard let config = hotkeySettings.getConfig(for: "directCopy\(i)") else {
                 XCTFail("directCopy\(i) config should exist")
                 continue
@@ -168,9 +171,9 @@ final class HotkeySettingsTests: XCTestCase {
     
     func testDirectCopyKeyMapping() {
         // Test that direct copy configs have correct key mappings
-        let expectedKeyCodes: [UInt32] = [18, 19, 20, 21, 23, 22] // 1, 2, 3, 4, 5, 6
+        let expectedKeyCodes: [UInt32] = [18, 19, 20, 21, 23, 22, 26, 28, 25] // 1, 2, 3, 4, 5, 6, 7, 8, 9
         
-        for i in 1...6 {
+        for i in 1...9 {
             guard let config = hotkeySettings.getConfig(for: "directCopy\(i)") else {
                 XCTFail("directCopy\(i) config should exist")
                 continue

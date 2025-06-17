@@ -92,6 +92,24 @@ public class HotkeySettings {
                 displayName: "Copy & Paste Item 6",
                 defaultKeyCode: 22, // 6
                 defaultModifiers: UInt32(cmdKey | optionKey)
+            ),
+            "directCopy7": HotkeyConfig(
+                id: "directCopy7",
+                displayName: "Copy & Paste Item 7",
+                defaultKeyCode: 26, // 7
+                defaultModifiers: UInt32(cmdKey | optionKey)
+            ),
+            "directCopy8": HotkeyConfig(
+                id: "directCopy8",
+                displayName: "Copy & Paste Item 8",
+                defaultKeyCode: 28, // 8
+                defaultModifiers: UInt32(cmdKey | optionKey)
+            ),
+            "directCopy9": HotkeyConfig(
+                id: "directCopy9",
+                displayName: "Copy & Paste Item 9",
+                defaultKeyCode: 25, // 9
+                defaultModifiers: UInt32(cmdKey | optionKey)
             )
         ]
     }

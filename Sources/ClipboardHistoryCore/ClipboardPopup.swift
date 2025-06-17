@@ -606,7 +606,7 @@ public class ClipboardPopup: NSObject {
         }
         
         // Add click instruction with dynamic hotkey info
-        let instructionText = containerView.index < 6 ? 
+        let instructionText = containerView.index < 9 ? 
             "Click: copy • Hover+⌘V: paste • ⌘⌥\(containerView.index + 1): paste instantly" :
             "Click: copy • Hover+⌘V: paste • ⌘+click/right-click: full text"
         let instructionLabel = NSTextField(labelWithString: instructionText)

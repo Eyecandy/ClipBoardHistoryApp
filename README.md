@@ -5,8 +5,7 @@ A powerful macOS menu bar app that revolutionizes clipboard management with auto
 ## ✨ Key Features
 
 ### 🚀 **Instant Paste Workflow**
-- **⌘⌥1-6: Instant copy & paste** - Items are copied AND automatically pasted
-- **🔮 Preview on Hold** - Hold ⌘⌥1-6 for 0.5s to see preview before pasting
+- **⌘⌥1-9: Instant copy & paste** - Items are copied AND automatically pasted
 - **Click to copy** - Single click in popup copies item to clipboard  
 - **Hover+⌘V to paste** - Hover over item, then press ⌘V to paste
 - **Focus preservation** - Maintains your cursor position in original app
@@ -14,7 +13,7 @@ A powerful macOS menu bar app that revolutionizes clipboard management with auto
 ### 📌 **Pinned Items System**
 - **Pin frequently used items** for permanent access
 - **⌘⇧P: Show pinned items** popup (configurable hotkey)
-- **Mode switching** - ⌘⌥1-6 picks from current mode (history or pinned)
+- **Mode switching** - ⌘⌥1-9 picks from current mode (history or pinned)
 - **Persistent pinning** - Pinned items survive app restarts
 
 ### ⚙️ **Fully Configurable Hotkeys**
@@ -60,8 +59,8 @@ swift build -c release && swift run
 
 #### **Instant Paste (Fastest)**
 - **⌘⌥1**: Copy & paste most recent item instantly
-- **⌘⌥2-6**: Copy & paste items 2-6 instantly
-- **Hold ⌘⌥1-6**: Preview window after 0.5s, auto-paste after 2.5s
+- **⌘⌥2-9**: Copy & paste items 2-9 instantly
+
 - Perfect for repetitive workflows
 
 #### **Popup Selection (Visual)**
@@ -96,7 +95,7 @@ swift build -c release && swift run
 #### **Pin Management**
 - **Right-click** any item → "Pin Item"
 - **Pinned items menu** for bulk management
-- **Mode switching** - ⌘⌥1-6 uses current mode
+- **Mode switching** - ⌘⌥1-9 uses current mode
 
 ### 🎯 **Interaction Methods**
 
@@ -106,8 +105,7 @@ swift build -c release && swift run
 | **Hover+⌘V** | Copy then paste | Copy then paste | - |
 | **⌘+Click** | View full text | View full text | View full text |
 | **Right-click** | Context menu | Context menu | Submenu |
-| **⌘⌥1-6** | Copy & paste item 1-6 | Copy & paste item 1-6 | - |
-| **Hold ⌘⌥1-6** | Preview → auto-paste | Preview → auto-paste | - |
+| **⌘⌥1-9** | Copy & paste item 1-9 | Copy & paste item 1-9 | - |
 
 ### 🔄 **Workflow Examples**
 
@@ -124,7 +122,7 @@ swift build -c release && swift run
 #### **Mixed Workflow**
 1. Copy something → automatically in history
 2. **Pin** important items for later
-3. Use **⌘⌥1-6** to access either mode
+3. Use **⌘⌥1-9** to access either mode
 
 ## 🏗️ Technical Architecture
 
@@ -173,7 +171,7 @@ Comprehensive test coverage for:
 |--------|--------|--------------|
 | **⌘⇧C** | Show clipboard history | ✅ |
 | **⌘⇧P** | Show pinned items | ✅ |
-| **⌘⌥1-6** | Copy & paste items 1-6 | ✅ |
+| **⌘⌥1-9** | Copy & paste items 1-9 | ✅ |
 
 *All hotkeys can be customized in Settings → Configure Hotkeys*
 

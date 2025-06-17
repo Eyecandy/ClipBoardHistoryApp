@@ -21,9 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var isPinnedCollapsed: Bool = false
     private let maxMenuHistoryItems: Int = 10
     private let maxMenuPinnedItems: Int = 10
-    private var previewWindow: NSWindow?
-    private var previewIndex: Int?
-    private var previewTimer: Timer?
+
     
     enum PopupMode {
         case history
@@ -409,7 +407,7 @@ agree to be bound by these terms and disclaimers.
         }
         
         let directHotkeyInfo = NSMenuItem(
-            title: "⌘⌥1-6: Copy & paste items 1-6 instantly",
+            title: "⌘⌥1-9: Copy & paste items 1-9 instantly",
             action: nil,
             keyEquivalent: ""
         )
@@ -417,7 +415,7 @@ agree to be bound by these terms and disclaimers.
         menu.addItem(directHotkeyInfo)
         
         let copyInfo = NSMenuItem(
-            title: "Click: copy • Hover+⌘V: paste • ⌘+click or right-click: full text",
+            title: "Click: copy • Hover+⌘V: paste • ⌘⌥1-9: instant paste",
             action: nil,
             keyEquivalent: ""
         )
@@ -1342,7 +1340,7 @@ agree to be bound by these terms and disclaimers.
 🚀 QUICK START
 ⌘⇧C → Show clipboard history
 ⌘⇧P → Show pinned items  
-⌘⌥1-6 → Instant copy & paste
+⌘⌥1-9 → Instant copy & paste
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1361,9 +1359,9 @@ agree to be bound by these terms and disclaimers.
 ⌘⌥6      Copy & paste item #6 from current mode
 
 💡 SMART MODE SWITCHING
-The ⌘⌥1-6 hotkeys remember your last mode:
-• Use ⌘⇧C first → ⌘⌥1-6 picks from clipboard history
-• Use ⌘⇧P first → ⌘⌥1-6 picks from pinned items
+The ⌘⌥1-9 hotkeys remember your last mode:
+• Use ⌘⇧C first → ⌘⌥1-9 picks from clipboard history
+• Use ⌘⇧P first → ⌘⌥1-9 picks from pinned items
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1376,8 +1374,8 @@ Right-Click          Context menu (copy, paste, pin, delete, view)
 Hover+⌘V            Copy on hover, paste with ⌘V
 
 ⏱️ PREVIEW FEATURE (NEW!)
-Hold ⌘⌥1-6         Shows preview window after 0.5 seconds
-                    Auto-executes paste after 2 seconds if held
+
+                    
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1789,117 +1787,9 @@ Version: Latest • Local-first • Privacy-focused
         settingsWindow = nil
     }
     
-    private func showPreview(for index: Int) {
-        let items = currentMode == .pinned ? 
-            clipboardManager?.getPinnedItems() ?? [] :
-            clipboardManager?.getHistory() ?? []
-            
-        guard index < items.count else { return }
-        
-        let selectedItem = items[index]
-        previewIndex = index
-        
-        // Hide existing preview if any
-        hidePreview()
-        
-        // Create preview window
-        let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
-        let windowSize = NSSize(width: 400, height: 120)
-        let windowOrigin = NSPoint(
-            x: screenFrame.midX - windowSize.width / 2,
-            y: screenFrame.midY + 100 // Slightly above center
-        )
-        
-        let windowRect = NSRect(origin: windowOrigin, size: windowSize)
-        let window = NSWindow(
-            contentRect: windowRect,
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: false
-        )
-        
-        window.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.95)
-        window.level = .modalPanel
-        window.hasShadow = true
-        window.isOpaque = false
-        
-        // Add rounded corners and border
-        window.contentView?.wantsLayer = true
-        window.contentView?.layer?.cornerRadius = 12
-        window.contentView?.layer?.borderWidth = 2
-        window.contentView?.layer?.borderColor = NSColor.systemBlue.cgColor
-        window.contentView?.layer?.masksToBounds = true
-        
-        // Create content view
-        let contentView = NSView(frame: NSRect(origin: .zero, size: windowSize))
-        contentView.wantsLayer = true
-        window.contentView = contentView
-        
-        // Add title
-        let titleLabel = NSTextField(labelWithString: "Preview: \(currentMode == .pinned ? "Pinned" : "History") Item \(index + 1)")
-        titleLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        titleLabel.textColor = NSColor.labelColor
-        titleLabel.frame = NSRect(x: 20, y: windowSize.height - 35, width: windowSize.width - 40, height: 20)
-        titleLabel.backgroundColor = NSColor.clear
-        contentView.addSubview(titleLabel)
-        
-        // Add preview text
-        let previewText = selectedItem.cleanedForDisplay().truncated(to: 60)
-        let previewLabel = NSTextField(labelWithString: previewText)
-        previewLabel.font = NSFont.systemFont(ofSize: 12)
-        previewLabel.textColor = NSColor.secondaryLabelColor
-        previewLabel.frame = NSRect(x: 20, y: 45, width: windowSize.width - 40, height: 40)
-        previewLabel.backgroundColor = NSColor.clear
-        previewLabel.lineBreakMode = .byWordWrapping
-        previewLabel.maximumNumberOfLines = 2
-        contentView.addSubview(previewLabel)
-        
-        // Add instruction
-        let instructionLabel = NSTextField(labelWithString: "Release to paste • Hold another ⌘⌥(1-6) to switch")
-        instructionLabel.font = NSFont.systemFont(ofSize: 10)
-        instructionLabel.textColor = NSColor.tertiaryLabelColor
-        instructionLabel.frame = NSRect(x: 20, y: 15, width: windowSize.width - 40, height: 15)
-        instructionLabel.backgroundColor = NSColor.clear
-        instructionLabel.alignment = .center
-        contentView.addSubview(instructionLabel)
-        
-        previewWindow = window
-        
-        // Show with animation
-        window.alphaValue = 0
-        window.orderFront(nil)
-        
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.2
-            window.animator().alphaValue = 1.0
-        }
-        
-        // If popup is visible, add visual highlight
-        if let popup = clipboardPopup, popup.isVisible() {
-            // This would require additional popup enhancement
-            // For now, just show the preview window
-        }
-    }
-    
-    private func hidePreview() {
-        guard let window = previewWindow else { return }
-        
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.15
-            window.animator().alphaValue = 0
-        }) {
-            window.orderOut(nil)
-            self.previewWindow = nil
-            self.previewIndex = nil
-        }
-    }
+
 
     @objc func quit() {
-        // Clean up preview window if open
-        hidePreview()
-        previewTimer?.invalidate()
-        previewTimer = nil
-        
         // Clean up full text window if open
         if let window = fullTextWindow {
             window.delegate = nil
@@ -2017,17 +1907,7 @@ extension AppDelegate: ClipboardHistoryCore.HotkeyManagerDelegate {
         }
     }
     
-    func directHotkeyPreview(for index: Int) {
-        DispatchQueue.main.async { [weak self] in
-            self?.showPreview(for: index)
-        }
-    }
-    
-    func directHotkeyPreviewEnded() {
-        DispatchQueue.main.async { [weak self] in
-            self?.hidePreview()
-        }
-    }
+
 }
 
 // MARK: - ClipboardPopupDelegate  
