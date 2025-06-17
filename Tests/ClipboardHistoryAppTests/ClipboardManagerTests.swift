@@ -7,6 +7,16 @@ final class ClipboardManagerTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
+        
+        // Clear any existing settings for clean tests
+        UserDefaults.standard.removeObject(forKey: "ClipboardHistory")
+        UserDefaults.standard.removeObject(forKey: "ClipboardPinned")
+        UserDefaults.standard.removeObject(forKey: "PopupItemCount")
+        UserDefaults.standard.removeObject(forKey: "PopupItemCount_set")
+        UserDefaults.standard.removeObject(forKey: "PopupTimeout")
+        UserDefaults.standard.removeObject(forKey: "PopupTimeout_set")
+        UserDefaults.standard.synchronize()
+        
         clipboardManager = ClipboardManager()
         mockDelegate = MockClipboardManagerDelegate()
         clipboardManager.delegate = mockDelegate
@@ -182,7 +192,7 @@ final class ClipboardManagerTests: XCTestCase {
     
     func testDefaultPopupItemCount() {
         let defaultCount = clipboardManager.getPopupItemCount()
-        XCTAssertEqual(defaultCount, 5, "Default popup item count should be 5")
+        XCTAssertEqual(defaultCount, 3, "Default popup item count should be 3")
     }
     
     func testSetValidPopupItemCount() {
@@ -290,6 +300,181 @@ final class ClipboardManagerTests: XCTestCase {
         for i in 0..<6 {
             XCTAssertTrue(i < history.count, "Index \(i) should be valid for direct hotkey ⌘⌥\(i + 1)")
         }
+    }
+    
+    // MARK: - Pinned Items Tests
+    
+    func testInitialPinnedItemsEmpty() {
+        XCTAssertTrue(clipboardManager.getPinnedItems().isEmpty, "Initial pinned items should be empty")
+    }
+    
+    func testPinItem() {
+        let testItem = "Test pinned item"
+        
+        clipboardManager.pinItem(testItem)
+        
+        let pinnedItems = clipboardManager.getPinnedItems()
+        XCTAssertEqual(pinnedItems.count, 1, "Should have one pinned item")
+        XCTAssertEqual(pinnedItems.first, testItem, "Pinned item should match")
+        XCTAssertTrue(clipboardManager.isPinned(testItem), "Item should be marked as pinned")
+        XCTAssertTrue(mockDelegate.clipboardDidChangeWasCalled, "Delegate should be notified")
+    }
+    
+    func testPinMultipleItems() {
+        let items = ["First pinned", "Second pinned", "Third pinned"]
+        
+        for item in items {
+            clipboardManager.pinItem(item)
+        }
+        
+        let pinnedItems = clipboardManager.getPinnedItems()
+        XCTAssertEqual(pinnedItems.count, 3, "Should have all pinned items")
+        XCTAssertEqual(pinnedItems[0], "Third pinned", "Most recently pinned should be first")
+        XCTAssertEqual(pinnedItems[1], "Second pinned", "Second most recent should be second")
+        XCTAssertEqual(pinnedItems[2], "First pinned", "Oldest pinned should be last")
+    }
+    
+    func testPinDuplicateMovesToTop() {
+        let items = ["First pinned", "Second pinned", "Third pinned"]
+        
+        for item in items {
+            clipboardManager.pinItem(item)
+        }
+        
+        // Pin first item again
+        clipboardManager.pinItem("First pinned")
+        
+        let pinnedItems = clipboardManager.getPinnedItems()
+        XCTAssertEqual(pinnedItems.count, 3, "Should still have 3 unique pinned items")
+        XCTAssertEqual(pinnedItems[0], "First pinned", "Re-pinned item should move to top")
+    }
+    
+    func testUnpinItem() {
+        let testItem = "Test pinned item"
+        
+        clipboardManager.pinItem(testItem)
+        XCTAssertTrue(clipboardManager.isPinned(testItem), "Item should be pinned")
+        
+        clipboardManager.unpinItem(testItem)
+        
+        XCTAssertFalse(clipboardManager.isPinned(testItem), "Item should no longer be pinned")
+        XCTAssertTrue(clipboardManager.getPinnedItems().isEmpty, "Pinned items should be empty")
+    }
+    
+    func testPinnedItemsMaxSize() {
+        // Pin more than max size (10) items
+        for i in 1...15 {
+            clipboardManager.pinItem("Pinned item \(i)")
+        }
+        
+        let pinnedItems = clipboardManager.getPinnedItems()
+        XCTAssertEqual(pinnedItems.count, 10, "Pinned items should be limited to max size")
+        XCTAssertEqual(pinnedItems[0], "Pinned item 15", "Most recent should be first")
+        XCTAssertEqual(pinnedItems[9], "Pinned item 6", "Oldest kept should be last")
+    }
+    
+    func testClearPinnedItems() {
+        clipboardManager.pinItem("Item 1")
+        clipboardManager.pinItem("Item 2")
+        
+        XCTAssertFalse(clipboardManager.getPinnedItems().isEmpty, "Should have pinned items")
+        
+        clipboardManager.clearPinnedItems()
+        
+        XCTAssertTrue(clipboardManager.getPinnedItems().isEmpty, "Pinned items should be empty")
+    }
+    
+    func testDeletePinnedItem() {
+        let items = ["First", "Second", "Third"]
+        for item in items {
+            clipboardManager.pinItem(item)
+        }
+        
+        clipboardManager.deletePinnedItem(at: 1) // Delete "Second"
+        
+        let pinnedItems = clipboardManager.getPinnedItems()
+        XCTAssertEqual(pinnedItems.count, 2, "Should have one less pinned item")
+        XCTAssertEqual(pinnedItems[0], "Third", "First item should remain")
+        XCTAssertEqual(pinnedItems[1], "First", "Last item should remain")
+    }
+    
+    func testGetCurrentClipboardItem() {
+        // This tests the getCurrentClipboardItem method
+        let _ = clipboardManager.getCurrentClipboardItem()
+        // Since we can't control the actual system clipboard in tests,
+        // we just ensure the method doesn't crash
+        XCTAssertNoThrow(clipboardManager.getCurrentClipboardItem(), "getCurrentClipboardItem should not crash")
+    }
+    
+    // MARK: - Popup Timeout Tests
+    
+    func testDefaultPopupTimeout() {
+        let defaultTimeout = clipboardManager.getPopupTimeout()
+        XCTAssertEqual(defaultTimeout, 10, "Default popup timeout should be 10 seconds")
+    }
+    
+    func testSetValidPopupTimeout() {
+        clipboardManager.setPopupTimeout(30)
+        let timeout = clipboardManager.getPopupTimeout()
+        XCTAssertEqual(timeout, 30, "Should set valid popup timeout")
+    }
+    
+    func testSetPopupTimeoutMinimum() {
+        clipboardManager.setPopupTimeout(0)
+        let timeout = clipboardManager.getPopupTimeout()
+        XCTAssertEqual(timeout, 0, "Should accept minimum value of 0 (never hide)")
+    }
+    
+    func testSetPopupTimeoutMaximum() {
+        clipboardManager.setPopupTimeout(300)
+        let timeout = clipboardManager.getPopupTimeout()
+        XCTAssertEqual(timeout, 300, "Should accept maximum value of 300 (5 minutes)")
+    }
+    
+    func testSetPopupTimeoutAboveMaximum() {
+        clipboardManager.setPopupTimeout(400)
+        let timeout = clipboardManager.getPopupTimeout()
+        XCTAssertEqual(timeout, 300, "Should clamp to maximum value of 300")
+    }
+    
+    func testSetPopupTimeoutNegative() {
+        clipboardManager.setPopupTimeout(-10)
+        let timeout = clipboardManager.getPopupTimeout()
+        XCTAssertEqual(timeout, 0, "Should clamp negative values to 0")
+    }
+    
+    func testPopupTimeoutDisplayString() {
+        // Test various timeout values and their display strings
+        clipboardManager.setPopupTimeout(0)
+        XCTAssertEqual(clipboardManager.getPopupTimeoutDisplayString(), "Never (manual dismiss only)")
+        
+        clipboardManager.setPopupTimeout(5)
+        XCTAssertEqual(clipboardManager.getPopupTimeoutDisplayString(), "5 seconds")
+        
+        clipboardManager.setPopupTimeout(1)
+        XCTAssertEqual(clipboardManager.getPopupTimeoutDisplayString(), "1 second")
+        
+        clipboardManager.setPopupTimeout(60)
+        XCTAssertEqual(clipboardManager.getPopupTimeoutDisplayString(), "1 minute")
+        
+        clipboardManager.setPopupTimeout(120)
+        XCTAssertEqual(clipboardManager.getPopupTimeoutDisplayString(), "2 minutes")
+        
+        clipboardManager.setPopupTimeout(90)
+        XCTAssertEqual(clipboardManager.getPopupTimeoutDisplayString(), "1m 30s")
+        
+        clipboardManager.setPopupTimeout(185)
+        XCTAssertEqual(clipboardManager.getPopupTimeoutDisplayString(), "3m 5s")
+    }
+    
+    func testPopupTimeoutPersistence() {
+        clipboardManager.setPopupTimeout(45)
+        
+        // Create new instance to test persistence
+        let newManager = ClipboardManager()
+        let persistedTimeout = newManager.getPopupTimeout()
+        
+        XCTAssertEqual(persistedTimeout, 45, "Popup timeout should persist between instances")
     }
 }
 

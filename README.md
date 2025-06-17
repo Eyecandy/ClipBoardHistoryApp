@@ -1,208 +1,183 @@
 # Clipboard History App
 
-A modern, professional macOS menu bar app that tracks your clipboard history and provides lightning-fast access to previously copied items with comprehensive testing, clean architecture, and advanced management features.
+A powerful macOS menu bar app that revolutionizes clipboard management with auto-paste functionality, pinned items, configurable hotkeys, and intelligent workflow features.
 
-## ✨ Features
+## ✨ Key Features
 
-### Core Functionality
-- 📋 **Tracks up to 20 recent clipboard items** with automatic persistence
-- 🔍 **Professional menu bar interface** with numbered items and keyboard shortcuts
-- ⚡ **Global hotkey support (⌘⇧C)** - Shows top items in a floating popup near your cursor
-- 🎯 **Direct item access (⌘⇧1-6)** - Copy clipboard items 1-6 instantly without popup
-- 🎛️ **Customizable popup size** - Configure 1-20 items to show in popup (default: 5)
-- 💾 **Persistent history** - Items are saved and restored between app sessions
-- 🧹 **Individual item deletion** and complete history clearing
+### 🚀 **Instant Paste Workflow**
+- **⌘⌥1-6: Instant copy & paste** - Items are copied AND automatically pasted
+- **Click to copy** - Single click in popup copies item to clipboard  
+- **Hover+⌘V to paste** - Hover over item, then press ⌘V to paste
+- **Focus preservation** - Maintains your cursor position in original app
 
-### Advanced Interactions
-- 🖱️ **Multiple interaction methods:**
-  - **Single click**: Copy item to clipboard
-  - **⌘+Click**: View full text content (primary method)
-  - **Double-click**: View full text content (fallback)
-  - **Right-click**: Context menu with copy, view, and delete options
-- 👀 **Professional full text viewer** with scrollable content and character count
-- 🎯 **Visual indexing** - All items show numbers (1, 2, 3...) for easy identification
-- ⚡ **Smart auto-hide** - Popup pauses when mouse hovers, resumes when you move away
-- 🎨 **Focus preservation** - Returns cursor to original app after selection
+### 📌 **Pinned Items System**
+- **Pin frequently used items** for permanent access
+- **⌘⇧P: Show pinned items** popup (configurable hotkey)
+- **Mode switching** - ⌘⌥1-6 picks from current mode (history or pinned)
+- **Persistent pinning** - Pinned items survive app restarts
 
-### Professional Polish
-- 🎯 **Menu bar only** (no dock icon) - lightweight and unobtrusive
-- 🎨 **Custom icons** - Professional clipboard symbol with high-quality app icons
-- 🔄 **Smart text handling** - Multi-line text is properly cleaned for display
-- ⚡ **Lightweight and fast** with modern Swift architecture
-- 🛡️ **Secure** - No sensitive data logging, local-only storage
+### ⚙️ **Fully Configurable Hotkeys**
+- **All hotkeys customizable** with user-friendly names
+- **Settings window** for easy hotkey configuration  
+- **Reset individual** or **reset all** hotkey options
+- **Live preview** of current key combinations
+
+### 🎯 **Smart Visual Feedback**
+- **🟢 Current clipboard item** highlighted everywhere
+- **Blue highlighting** in popups for current item
+- **Visual mode indicators** (📌 Pinned, 📋 History)
+- **Enhanced hover effects** with clear interaction cues
+
+### ⏱️ **Configurable Popup Behavior**
+- **Auto-hide timeout**: 0-5 minutes (0 = never hide)
+- **Smart timeout display**: Shows minutes and seconds
+- **Mouse-aware hiding** - Pauses when hovering
+- **No focus stealing** - Popup doesn't interrupt your work
 
 ## 🔧 Requirements
 
 - macOS 13.0 or later
 - Xcode 15.0 or later (for building from source)
 
-## 🚀 Building and Running
+## 🚀 Quick Start
 
-### Using Swift Package Manager (Recommended)
+### Build & Run
+```bash
+swift build -c release && swift run
+```
 
-1. Open Terminal and navigate to the project directory
-2. Build the project:
-   ```bash
-   swift build -c release
-   ```
-3. Run the app:
-   ```bash
-   swift run
-   ```
-
-### Using the Build Script
-
-The project includes a convenient build script that creates a proper app bundle:
-
+### Using Build Script
 ```bash
 ./build_and_run.sh
 ```
 
-This script:
-- Builds the project for release
-- Creates a proper macOS app bundle
-- Code signs the app for consistent permissions
-- Runs the app with persistent settings
+## 📖 Usage Guide
 
-### Using Xcode
+### 🔥 **Power User Workflow**
 
-1. Open Terminal and navigate to the project directory
-2. Generate Xcode project:
-   ```bash
-   swift package generate-xcodeproj
-   ```
-3. Open `ClipboardHistoryApp.xcodeproj` in Xcode
-4. Build and run (⌘+R)
+#### **Instant Paste (Fastest)**
+- **⌘⌥1**: Copy & paste most recent item instantly
+- **⌘⌥2-6**: Copy & paste items 2-6 instantly
+- Perfect for repetitive workflows
 
-## 📖 Usage
+#### **Popup Selection (Visual)**
+- **⌘⇧C**: Show clipboard history popup
+- **⌘⇧P**: Show pinned items popup  
+- **Click**: Copy item to clipboard
+- **Hover+⌘V**: Copy on hover, paste with ⌘V
+- **⌘+Click**: View full text
 
-### Menu Bar Access
-1. After launching, you'll see a clipboard icon in your menu bar
-2. Copy any text to your clipboard - it will be automatically tracked and saved
-3. Click the menu bar icon to see your clipboard history with numbered items
-4. **First 6 items show ⌘⌥1-6 shortcuts** for direct access
-5. Each clipboard item has three options:
-   - **Copy**: Copy the item back to your clipboard
-   - **View Full Text**: See the complete content in a resizable window
-   - **Delete**: Remove this specific item from history
-6. Use "Clear History" to remove all tracked items
-7. Configure popup item count in Settings → Popup Items (1-20 items)
+#### **Menu Bar Access (Complete)**
+- Click clipboard icon for full menu
+- **🟢 Green dot** shows current clipboard item
+- **📌 Pinned Items** section at top
+- **📋 Recent History** section below
 
-### Global Hotkeys
+### ⚙️ **Customization**
 
-#### Quick Popup (⌘⇧C)
-1. Press **⌘⇧C** (Cmd+Shift+C) anywhere on your Mac
-2. A floating popup appears near your cursor showing recent clipboard items
-3. **Interaction methods:**
-   - **Click**: Copy item to clipboard
-   - **⌘+Click**: View full text content (recommended)
-   - **Double-click**: View full text content (fallback)
-   - **Right-click**: Show context menu with copy, view, and delete options
-4. The popup automatically hides after 10 seconds
-5. **Smart behavior**: Pauses auto-hide when mouse hovers over items
-6. Shows specific hotkey for each item (e.g., "⌘⌥1: direct copy")
+#### **Hotkey Configuration**
+1. Menu Bar → Settings → Configure Hotkeys
+2. Click any hotkey combination to change
+3. Use "Reset" or "Reset All" as needed
+4. All hotkeys have descriptive names
 
-#### Direct Item Access (⌘⌥1-6)
-1. Press **⌘⌥1** through **⌘⌥6** anywhere on your Mac
-2. **Instantly copies** the corresponding clipboard item (1st, 2nd, 3rd, etc.)
-3. **No popup needed** - immediate clipboard access for maximum speed
-4. Only works if the item exists (e.g., ⌘⌥3 only works if you have 3+ items)
-5. Perfect for frequently accessed items
-6. **Silent operation** - no visual feedback for security
+#### **Popup Settings**
+- **Display Items**: 1-20 items in popup
+- **Auto-Hide Timeout**: 0-5 minutes
+  - 0 = Never auto-hide
+  - Shows as "2m 30s" for times ≥60 seconds
 
-### Settings & Customization
-1. **Popup Item Count**: Access via menu bar → Settings → Popup Items
-   - Choose from 1 to 20 items to show in the popup
-   - Default is 5 items for optimal balance
-   - Setting is saved and persists between app sessions
-2. **Clear History**: Remove all tracked clipboard items
-3. **Visual feedback**: Current setting highlighted in menu
+#### **Pin Management**
+- **Right-click** any item → "Pin Item"
+- **Pinned items menu** for bulk management
+- **Mode switching** - ⌘⌥1-6 uses current mode
 
-### Copy-Only Workflow
-- This app uses a **copy-only** approach for simplicity and reliability
-- When you select an item (from menu or popup), it's copied to your clipboard
-- You then paste it manually wherever needed using **⌘V**
-- **No accessibility permissions required**
-- Works consistently across all applications
-- **Focus preservation** - cursor returns to original app position
+### 🎯 **Interaction Methods**
 
-## 🏗️ Architecture & Development
+| Action | History Popup | Pinned Popup | Menu Items |
+|--------|---------------|--------------|------------|
+| **Click** | Paste directly | Paste directly | Copy & paste |
+| **Hover+⌘V** | Copy then paste | Copy then paste | - |
+| **⌘+Click** | View full text | View full text | View full text |
+| **Right-click** | Context menu | Context menu | Submenu |
+| **⌘⌥1-6** | Paste item 1-6 | Paste item 1-6 | - |
 
-### Clean Architecture
-The app follows modern Swift architecture with separated concerns:
+### 🔄 **Workflow Examples**
 
-- **`ClipboardHistoryCore`** - Core business logic library
-  - **`ClipboardManager.swift`** - Clipboard monitoring, history management, and persistence
-  - **`HotkeyManager.swift`** - Global hotkey registration using Carbon API (7 total hotkeys)
-  - **`ClipboardPopup.swift`** - Floating popup window with rich interaction support
-  - **`StringExtensions.swift`** - Text processing utilities
-- **`ClipboardHistoryApp`** - Main executable
-  - **`main.swift`** - App entry point, coordination, and UI management
+#### **Code Snippets (Pinned Items)**
+1. Pin frequently used code snippets
+2. Press **⌘⇧P** to show pinned items
+3. **⌘⌥1** to instantly paste most-used snippet
 
-### Quality Assurance
-- **68 comprehensive unit tests** with 100% pass rate
-- **4 test suites** covering all major components:
-  - ClipboardManagerTests (24 tests) - History management, persistence, direct hotkey support
-  - HotkeyManagerTests (13 tests) - Hotkey registration, delegate patterns, direct hotkeys  
-  - ClipboardPopupTests (13 tests) - Popup behavior, mouse interaction, display logic
-  - StringExtensionTests (18 tests) - Text cleaning and truncation utilities
-- **Zero build warnings** in both debug and release configurations
-- **Memory leak prevention** with proper cleanup and weak references
+#### **Research & Writing (History)**
+1. Copy quotes, references, notes
+2. Press **⌘⇧C** to see recent items
+3. **Hover** over item, press **⌘V** to paste
 
-### Technical Features
-- **Persistent Storage**: Uses UserDefaults for reliable history persistence
-- **Memory Efficient**: Automatic cleanup of old items (20 item limit)
-- **Thread Safe**: Proper main queue dispatching for UI updates
-- **Modern Swift**: Uses latest Swift patterns and best practices
-- **No External Dependencies**: Pure Swift and AppKit implementation
-- **Global Hotkeys**: Carbon API integration for system-wide hotkey support
-- **Professional Error Handling**: Comprehensive bounds checking and safe unwrapping
-- **Security-First**: No sensitive data logging, secure clipboard handling
+#### **Mixed Workflow**
+1. Copy something → automatically in history
+2. **Pin** important items for later
+3. Use **⌘⌥1-6** to access either mode
+
+## 🏗️ Technical Architecture
+
+### Core Components
+- **`ClipboardManager`** - History, pinning, auto-paste, settings
+- **`HotkeyManager`** - Configurable hotkeys, mode switching  
+- **`HotkeySettings`** - Persistent hotkey configuration
+- **`ClipboardPopup`** - Enhanced popup with highlighting & timeout
+- **`main.swift`** - UI coordination, settings windows
+
+### New Features Added
+- ✅ **Auto-paste simulation** using CGEvent for ⌘V
+- ✅ **Pinned items storage** with UserDefaults persistence
+- ✅ **Configurable hotkeys** with HotkeySettings class
+- ✅ **Current item tracking** and visual highlighting
+- ✅ **Timeout configuration** with smart display formatting
+- ✅ **Mode switching** between history and pinned items
+- ✅ **Focus preservation** using NSRunningApplication
+- ✅ **Enhanced popup interaction** without focus stealing
 
 ## 🔒 Privacy & Security
 
-- ✅ **Local Only**: No data is sent to external servers
-- ✅ **No Accessibility Permissions**: Copy-only approach eliminates permission requirements
-- ✅ **User Control**: Easy deletion of specific items or complete history
-- ✅ **Transparent**: Open source with clear, readable code
-- ✅ **Minimal Footprint**: Only accesses clipboard when changes are detected
-- ✅ **Secure Logging**: No clipboard content logged in release builds
-- ✅ **Safe Memory Management**: Proper cleanup prevents data leaks
-
-## 📦 Installation
-
-### From Source
-Follow the build instructions above to create your own app bundle.
-
-### Pre-built App (if available)
-Copy the `ClipboardHistoryApp.app` to your `/Applications/` folder for system-wide access.
+- **✅ Local-only storage** - No cloud sync or external servers
+- **✅ No accessibility permissions** required
+- **✅ Secure hotkey handling** - No logging of key combinations  
+- **✅ User-controlled data** - Easy clearing and deletion
+- **✅ Focus-aware operations** - Respects current app context
 
 ## 🧪 Testing
-
-Run the comprehensive test suite:
 
 ```bash
 swift test
 ```
 
-All 68 tests should pass, covering:
-- Clipboard history management
-- Hotkey registration and handling
-- Popup display and interaction
-- Text processing and cleaning
-- Direct hotkey functionality
-- Memory management and cleanup
-- Settings persistence
+Comprehensive test coverage for:
+- Auto-paste functionality
+- Pinned items management  
+- Configurable hotkey system
+- Timeout behavior
+- Current item highlighting
+- Mode switching logic
+
+## 🎯 **Default Hotkeys**
+
+| Hotkey | Action | Configurable |
+|--------|--------|--------------|
+| **⌘⇧C** | Show clipboard history | ✅ |
+| **⌘⇧P** | Show pinned items | ✅ |
+| **⌘⌥1-6** | Copy & paste items 1-6 | ✅ |
+
+*All hotkeys can be customized in Settings → Configure Hotkeys*
 
 ## 🤝 Contributing
 
-This project maintains high code quality standards:
-- All code must pass existing tests
-- New features should include comprehensive tests
-- Follow Swift best practices and conventions
-- Ensure zero build warnings
-- Maintain security-first approach
+High-quality contributions welcome! Please ensure:
+- All tests pass
+- Code follows existing patterns
+- New features include tests
+- Documentation is updated
 
 ---
 
-*Built with Swift, AppKit, comprehensive testing, and attention to detail.* 
+**Made with ❤️ for productivity enthusiasts who want lightning-fast clipboard access with zero friction.** 

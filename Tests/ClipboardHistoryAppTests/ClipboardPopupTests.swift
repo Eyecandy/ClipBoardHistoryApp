@@ -135,9 +135,13 @@ class MockClipboardPopupDelegate: ClipboardPopupDelegate {
     var popupDidSelectItemWasCalled = false
     var popupDidRequestFullViewWasCalled = false
     var popupDidRequestDeleteWasCalled = false
+    var popupDidRequestPinWasCalled = false
+    var popupDidRequestPasteWasCalled = false
     var lastSelectedItem: String?
     var lastViewedItem: String?
     var lastDeletedItem: String?
+    var lastPinnedItem: String?
+    var lastPastedItem: String?
     
     func popupDidSelectItem(_ item: String) {
         popupDidSelectItemWasCalled = true
@@ -152,5 +156,15 @@ class MockClipboardPopupDelegate: ClipboardPopupDelegate {
     func popupDidRequestDelete(_ item: String) {
         popupDidRequestDeleteWasCalled = true
         lastDeletedItem = item
+    }
+    
+    func popupDidRequestPin(_ item: String) {
+        popupDidRequestPinWasCalled = true
+        lastPinnedItem = item
+    }
+    
+    func popupDidRequestPaste(_ item: String) {
+        popupDidRequestPasteWasCalled = true
+        lastPastedItem = item
     }
 } 

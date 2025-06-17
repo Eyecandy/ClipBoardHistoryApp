@@ -18,7 +18,9 @@ public class ClipboardManager {
     private let historyKey = "ClipboardHistory"
     private let pinnedKey = "ClipboardPinned"
     private let popupItemCountKey = "PopupItemCount"
+    private let popupTimeoutKey = "PopupTimeout"
     private let defaultPopupItemCount = 3
+    private let defaultPopupTimeout = 10 // 10 seconds
     
     public init() {}
     
@@ -207,13 +209,52 @@ public class ClipboardManager {
     public func getPopupItemCount() -> Int {
         let count = UserDefaults.standard.integer(forKey: popupItemCountKey)
         // Return default if not set, otherwise validate range
-        return count == 0 ? defaultPopupItemCount : max(1, min(20, count))
+        if !UserDefaults.standard.bool(forKey: "\(popupItemCountKey)_set") {
+            return defaultPopupItemCount
+        }
+        return max(1, min(20, count))
     }
     
     public func setPopupItemCount(_ count: Int) {
         let validatedCount = max(1, min(20, count))
         UserDefaults.standard.set(validatedCount, forKey: popupItemCountKey)
+        UserDefaults.standard.set(true, forKey: "\(popupItemCountKey)_set") // Mark as explicitly set
         UserDefaults.standard.synchronize()
+    }
+    
+    // MARK: - Popup Timeout Configuration
+    
+    public func getPopupTimeout() -> Int {
+        let timeout = UserDefaults.standard.integer(forKey: popupTimeoutKey)
+        // Return default if not set, otherwise validate range (0-300 seconds = 0-5 minutes)
+        if !UserDefaults.standard.bool(forKey: "\(popupTimeoutKey)_set") {
+            return defaultPopupTimeout
+        }
+        return max(0, min(300, timeout))
+    }
+    
+    public func setPopupTimeout(_ seconds: Int) {
+        let validatedTimeout = max(0, min(300, seconds)) // 0-5 minutes
+        UserDefaults.standard.set(validatedTimeout, forKey: popupTimeoutKey)
+        UserDefaults.standard.set(true, forKey: "\(popupTimeoutKey)_set") // Mark as explicitly set
+        UserDefaults.standard.synchronize()
+    }
+    
+    public func getPopupTimeoutDisplayString() -> String {
+        let timeout = getPopupTimeout()
+        if timeout == 0 {
+            return "Never (manual dismiss only)"
+        } else if timeout < 60 {
+            return "\(timeout) second\(timeout == 1 ? "" : "s")"
+        } else {
+            let minutes = timeout / 60
+            let seconds = timeout % 60
+            if seconds == 0 {
+                return "\(minutes) minute\(minutes == 1 ? "" : "s")"
+            } else {
+                return "\(minutes)m \(seconds)s"
+            }
+        }
     }
     
     // MARK: - Persistence

@@ -15,7 +15,6 @@ class ClipboardItemView: NSView {
     var isCurrentClipboardItem: Bool = false
     var isPinnedItem: Bool = false
     weak var popup: ClipboardPopup?
-    private var hoverTimer: Timer?
     
     override func mouseEntered(with event: NSEvent) {
         wantsLayer = true
@@ -25,20 +24,14 @@ class ClipboardItemView: NSView {
             layer?.backgroundColor = NSColor.selectedControlColor.withAlphaComponent(0.3).cgColor
         }
         
-        // Start hover timer for auto-paste
-        hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: false) { [weak self] _ in
-            self?.handleHoverTimeout()
-        }
+        // Select item on hover (ready for Cmd+V paste)
+        popup?.itemHovered(at: index)
         
         // Notify popup that mouse is inside
         popup?.mouseEnteredPopup()
     }
     
     override func mouseExited(with event: NSEvent) {
-        // Cancel hover timer
-        hoverTimer?.invalidate()
-        hoverTimer = nil
-        
         if isCurrentClipboardItem {
             layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.2).cgColor
         } else {
@@ -57,10 +50,7 @@ class ClipboardItemView: NSView {
         }
     }
     
-    private func handleHoverTimeout() {
-        // Auto-paste after hovering for 0.8 seconds
-        popup?.itemHovered(at: index)
-    }
+
     
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 36 { // Enter key
@@ -78,8 +68,8 @@ class ClipboardItemView: NSView {
             // Double-click to view full text (keep as fallback)
             popup?.itemDoubleClicked(at: index)
         } else {
-            // Single click to paste directly
-            popup?.itemClickedForPaste(at: index)
+            // Single click to copy only
+            popup?.itemClicked(at: index)
         }
     }
     
@@ -118,12 +108,13 @@ public class ClipboardPopup: NSObject {
     private var previousActiveApp: NSRunningApplication?
     private var autoHideTimer: Timer?
     private var isMouseInside = false
+    private var currentTimeout: Int = 10
     
     public override init() {
         super.init()
     }
     
-    public func show(with items: [String], maxItems: Int = 3, isPinned: Bool = false, currentClipboard: String? = nil) {
+    public func show(with items: [String], maxItems: Int = 3, isPinned: Bool = false, currentClipboard: String? = nil, timeout: Int = 10) {
         hide() // Hide any existing popup
         
         // Capture the currently active app before showing popup
@@ -133,13 +124,14 @@ public class ClipboardPopup: NSObject {
         clipboardItems = Array(items.prefix(validatedMaxItems))
         isPinnedMode = isPinned
         currentClipboardItem = currentClipboard
+        currentTimeout = timeout
         
         guard !clipboardItems.isEmpty else { 
             return 
         }
         
         let mouseLocation = NSEvent.mouseLocation
-        createWindow(at: mouseLocation)
+        createWindow(at: mouseLocation, timeout: timeout)
     }
     
     public func hide() {
@@ -205,11 +197,8 @@ public class ClipboardPopup: NSObject {
             return 
         }
         let selectedItem = clipboardItems[index]
-        delegate?.popupDidRequestPaste(selectedItem)
-        hide()
-        
-        // Restore focus immediately for paste operation
-        restorePreviousAppFocus()
+        // Just copy to clipboard on hover - user can paste with Cmd+V
+        delegate?.popupDidSelectItem(selectedItem)
     }
     
     func itemEnterPressed(at index: Int) {
@@ -340,7 +329,7 @@ public class ClipboardPopup: NSObject {
         }
     }
     
-    private func createWindow(at location: NSPoint) {
+    private func createWindow(at location: NSPoint, timeout: Int) {
         let windowDimensions = calculateWindowDimensions()
         let windowOrigin = calculateWindowPosition(
             at: location,
@@ -357,7 +346,7 @@ public class ClipboardPopup: NSObject {
         
         window = createStyledWindow(with: windowRect)
         setupWindowContent(windowDimensions: windowDimensions)
-        showAndConfigureWindow()
+        showAndConfigureWindow(timeout: timeout)
     }
     
     private func calculateWindowDimensions() -> (width: CGFloat, height: CGFloat) {
@@ -497,14 +486,14 @@ public class ClipboardPopup: NSObject {
         }
     }
     
-    private func showAndConfigureWindow() {
+    private func showAndConfigureWindow(timeout: Int) {
         guard let window = window else { return }
         
         // Show window without stealing focus - use orderFront instead of makeKeyAndOrderFront
         window.orderFront(nil)
         
-        // Start auto-hide timer (will be managed by mouse tracking)
-        startAutoHideTimer()
+        // Start auto-hide timer with configurable timeout (will be managed by mouse tracking)
+        startAutoHideTimer(timeout: timeout)
         
         // Hide when clicking outside
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
@@ -512,9 +501,13 @@ public class ClipboardPopup: NSObject {
         }
     }
     
-    private func startAutoHideTimer() {
+    private func startAutoHideTimer(timeout: Int) {
         autoHideTimer?.invalidate()
-        autoHideTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] _ in
+        
+        // Don't start timer if timeout is 0 (never auto-hide)
+        guard timeout > 0 else { return }
+        
+        autoHideTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(timeout), repeats: false) { [weak self] _ in
             if self?.isMouseInside == false {
                 self?.hide()
             }
@@ -528,7 +521,7 @@ public class ClipboardPopup: NSObject {
     
     private func resumeAutoHideTimer() {
         if autoHideTimer == nil && !isMouseInside {
-            startAutoHideTimer()
+            startAutoHideTimer(timeout: currentTimeout)
         }
     }
     
@@ -610,8 +603,8 @@ public class ClipboardPopup: NSObject {
         
         // Add click instruction with dynamic hotkey info
         let instructionText = containerView.index < 6 ? 
-            "Click: paste • Hover: auto-paste • ⌘⌥\(containerView.index + 1): paste instantly" :
-            "Click: paste • Hover: auto-paste • ⌘+click: view full"
+            "Click: copy • Hover+⌘V: paste • ⌘⌥\(containerView.index + 1): paste instantly" :
+            "Click: copy • Hover+⌘V: paste • ⌘+click: view full"
         let instructionLabel = NSTextField(labelWithString: instructionText)
         instructionLabel.font = NSFont.systemFont(ofSize: 9)
         instructionLabel.textColor = NSColor.secondaryLabelColor

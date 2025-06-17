@@ -98,16 +98,17 @@ final class HotkeyManagerTests: XCTestCase {
     
     func testDirectHotkeyDelegateCall() {
         // Test direct hotkey for index 0 (⌘⇧1)
-        mockDelegate.directHotkeyPressed(for: 0)
+        mockDelegate.directHotkeyPressed(for: 0, isAutoPaste: true)
         
         XCTAssertEqual(mockDelegate.directHotkeyIndex, 0, "Should call delegate with correct index")
         XCTAssertEqual(mockDelegate.directHotkeyCallCount, 1, "Should call delegate once")
+        XCTAssertTrue(mockDelegate.isAutoPaste, "Should pass auto-paste flag")
     }
     
     func testDirectHotkeyMultipleIndices() {
         // Test all 6 direct hotkeys
         for index in 0..<6 {
-            mockDelegate.directHotkeyPressed(for: index)
+            mockDelegate.directHotkeyPressed(for: index, isAutoPaste: true)
             XCTAssertEqual(mockDelegate.directHotkeyIndex, index, "Should call delegate with index \(index)")
         }
         
@@ -116,11 +117,11 @@ final class HotkeyManagerTests: XCTestCase {
     
     func testDirectHotkeyBoundaryValues() {
         // Test edge cases
-        mockDelegate.directHotkeyPressed(for: -1) // Should handle gracefully
-        mockDelegate.directHotkeyPressed(for: 0)  // Valid
-        mockDelegate.directHotkeyPressed(for: 5)  // Valid (last valid index)
-        mockDelegate.directHotkeyPressed(for: 6)  // Should handle gracefully
-        mockDelegate.directHotkeyPressed(for: 10) // Should handle gracefully
+        mockDelegate.directHotkeyPressed(for: -1, isAutoPaste: false) // Should handle gracefully
+        mockDelegate.directHotkeyPressed(for: 0, isAutoPaste: true)  // Valid
+        mockDelegate.directHotkeyPressed(for: 5, isAutoPaste: true)  // Valid (last valid index)
+        mockDelegate.directHotkeyPressed(for: 6, isAutoPaste: false)  // Should handle gracefully
+        mockDelegate.directHotkeyPressed(for: 10, isAutoPaste: false) // Should handle gracefully
         
         // All calls should be handled
         XCTAssertEqual(mockDelegate.directHotkeyCallCount, 5, "Should handle all calls")
@@ -145,10 +146,13 @@ class MockHotkeyManagerDelegate: HotkeyManagerDelegate {
     
     var directHotkeyIndex: Int = -1
     var directHotkeyCallCount = 0
+    var isAutoPaste: Bool = false
+    var hotkeyType: HotkeyType?
     
-    func hotkeyPressed() {
+    func hotkeyPressed(type: HotkeyType) {
         hotkeyPressedWasCalled = true
         hotkeyPressedCallCount += 1
+        hotkeyType = type
     }
     
     func quitHotkeyPressed() {
@@ -156,8 +160,9 @@ class MockHotkeyManagerDelegate: HotkeyManagerDelegate {
         quitHotkeyCallCount += 1
     }
     
-    func directHotkeyPressed(for index: Int) {
+    func directHotkeyPressed(for index: Int, isAutoPaste: Bool) {
         directHotkeyIndex = index
         directHotkeyCallCount += 1
+        self.isAutoPaste = isAutoPaste
     }
 } 

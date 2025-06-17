@@ -410,7 +410,7 @@ agree to be bound by these terms and disclaimers.
         menu.addItem(directHotkeyInfo)
         
         let copyInfo = NSMenuItem(
-            title: "Click: paste • Hover: auto-paste • ⌘+click: view full",
+            title: "Click: copy • Hover+⌘V: paste • ⌘+click: view full",
             action: nil,
             keyEquivalent: ""
         )
@@ -489,15 +489,6 @@ agree to be bound by these terms and disclaimers.
         // Add submenu for each item with options
         let submenu = NSMenu()
         
-        let copyAction = NSMenuItem(
-            title: "Copy & Paste",
-            action: #selector(pasteClipboardItem(_:)),
-            keyEquivalent: ""
-        )
-        copyAction.tag = index
-        copyAction.target = self
-        submenu.addItem(copyAction)
-        
         let copyOnlyAction = NSMenuItem(
             title: "Copy Only",
             action: #selector(selectClipboardItem(_:)),
@@ -506,6 +497,15 @@ agree to be bound by these terms and disclaimers.
         copyOnlyAction.tag = index
         copyOnlyAction.target = self
         submenu.addItem(copyOnlyAction)
+        
+        let copyAction = NSMenuItem(
+            title: "Copy & Paste",
+            action: #selector(pasteClipboardItem(_:)),
+            keyEquivalent: ""
+        )
+        copyAction.tag = index
+        copyAction.target = self
+        submenu.addItem(copyAction)
         
         let pinAction = NSMenuItem(
             title: "Pin Item",
@@ -557,15 +557,6 @@ agree to be bound by these terms and disclaimers.
         // Add submenu for each pinned item with options
         let submenu = NSMenu()
         
-        let copyAction = NSMenuItem(
-            title: "Copy & Paste",
-            action: #selector(pastePinnedItem(_:)),
-            keyEquivalent: ""
-        )
-        copyAction.tag = index
-        copyAction.target = self
-        submenu.addItem(copyAction)
-        
         let copyOnlyAction = NSMenuItem(
             title: "Copy Only",
             action: #selector(selectPinnedItem(_:)),
@@ -574,6 +565,15 @@ agree to be bound by these terms and disclaimers.
         copyOnlyAction.tag = index
         copyOnlyAction.target = self
         submenu.addItem(copyOnlyAction)
+        
+        let copyAction = NSMenuItem(
+            title: "Copy & Paste",
+            action: #selector(pastePinnedItem(_:)),
+            keyEquivalent: ""
+        )
+        copyAction.tag = index
+        copyAction.target = self
+        submenu.addItem(copyAction)
         
         let unpinAction = NSMenuItem(
             title: "Unpin Item",
@@ -653,6 +653,35 @@ agree to be bound by these terms and disclaimers.
         popupSettingsItem.submenu = popupSubmenu
         settingsSubmenu.addItem(popupSettingsItem)
         
+        // Add popup timeout setting
+        let timeoutSettingsItem = NSMenuItem(title: "Popup Auto-Hide Timeout", action: nil, keyEquivalent: "")
+        let timeoutSubmenu = NSMenu()
+        
+        let currentTimeout = clipboardManager?.getPopupTimeout() ?? 10
+        
+        // Timeout options: 0 (never), 5s, 10s, 15s, 30s, 1m, 2m, 5m
+        let timeoutOptions = [0, 5, 10, 15, 30, 60, 120, 300]
+        
+        for timeout in timeoutOptions {
+            let title = timeout == 0 ? "Never" : 
+                       timeout < 60 ? "\(timeout)s" :
+                       timeout == 60 ? "1m" :
+                       timeout == 120 ? "2m" : "5m"
+            
+            let timeoutItem = NSMenuItem(
+                title: title,
+                action: #selector(setPopupTimeout(_:)),
+                keyEquivalent: ""
+            )
+            timeoutItem.tag = timeout
+            timeoutItem.target = self
+            timeoutItem.state = (timeout == currentTimeout) ? .on : .off
+            timeoutSubmenu.addItem(timeoutItem)
+        }
+        
+        timeoutSettingsItem.submenu = timeoutSubmenu
+        settingsSubmenu.addItem(timeoutSettingsItem)
+        
         settingsSubmenu.addItem(NSMenuItem.separator())
         
         // Clear options
@@ -709,6 +738,11 @@ agree to be bound by these terms and disclaimers.
     
     @objc func setPopupItemCount(_ sender: NSMenuItem) {
         clipboardManager?.setPopupItemCount(sender.tag)
+        updateMenu() // Refresh menu to show new selection
+    }
+    
+    @objc func setPopupTimeout(_ sender: NSMenuItem) {
+        clipboardManager?.setPopupTimeout(sender.tag)
         updateMenu() // Refresh menu to show new selection
     }
     
@@ -1142,49 +1176,43 @@ agree to be bound by these terms and disclaimers.
     
     @objc func showUserManual() {
         let manualText = """
-ClipboardHistoryApp - User Manual
+ClipboardHistoryApp - Quick Reference
 
-🚀 QUICK START
-After launching, you'll see a clipboard icon in your menu bar.
-The app automatically tracks everything you copy (up to 20 items).
+🚀 INSTANT PASTE HOTKEYS
+⌘⌥1-6    Copy & paste items 1-6 instantly
 
-⌨️ GLOBAL HOTKEYS (Your Main Interface)
+🎯 POPUP HOTKEYS  
+⌘⇧C      Show clipboard history popup
+⌘⇧P      Show pinned items popup (configurable)
 
-🎯 ⌘⇧C - Quick Popup
-• Shows floating popup with recent clipboard items
-• Click to copy, ⌘+Click to view full text, Right-click for options
-• Auto-hides after 10 seconds (pauses when mouse hovers)
+✨ POPUP INTERACTIONS
+Click              Paste directly
+Hover + ⌘V         Copy item, then paste with ⌘V
+⌘+Click            View full text
+Right-click        Context menu (pin/unpin/delete)
 
-🎯 ⌘⌥1-6 - Direct Access
-• ⌘⌥1: Copy most recent item instantly
-• ⌘⌥2: Copy 2nd most recent item
-• ⌘⌥3-6: Copy 3rd-6th items
-• Silent operation - no popup, maximum speed
+📌 PINNED ITEMS
+• Pin frequently used items for permanent access
+• Right-click any item → "Pin Item"
+• ⌘⌥1-6 picks from current mode (history or pinned)
 
-📋 MENU BAR ACCESS
-Click the clipboard icon to:
-• View all history items (numbered 1, 2, 3...) with ⌘⌥1, ⌘⌥2, ⌘⌥3, etc.
-• Access settings: ⌘⇧C Popup Items (1-20 items)
-• Clear history or delete individual items
+⚙️ CUSTOMIZATION
+Menu Bar → Settings:
+• Configure Hotkeys - Change any hotkey combination  
+• Popup Display Items - 1-20 items shown
+• Auto-Hide Timeout - 0-5 minutes (0 = never)
 
-🔧 KEY FEATURES
-• Focus Preservation: Returns to your original app after selection
-• Copy-Only Workflow: Select item → it's copied → paste with ⌘V
-• Persistent History: Items saved between app sessions
-• Smart Text Handling: Full content preserved, truncated for display
+🎯 VISUAL CUES
+🟢 Current clipboard item (highlighted everywhere)
+📌 Pinned items section
+📋 Recent history section
 
 💡 WORKFLOW TIPS
-• Use ⌘⌥1-6 for frequently accessed items
-• Use ⌘⇧C popup when you need to see and choose
-• Use ⌘+Click to preview long text before copying
-• Adjust popup item count in Settings to match your needs
+• Pin code snippets, common phrases, addresses
+• Use history for recent research, quotes, notes
+• ⌘⌥1-6 works in both modes - switch with ⌘⇧C/⌘⇧P
 
-🔒 PRIVACY
-• All data stored locally on your device
-• No network transmission or cloud storage
-• Clear history regularly if handling sensitive data
-
-For more info: About ClipboardHistoryApp • License
+🔒 PRIVACY: Local storage only • No cloud sync • No permissions needed
 """
         
         showUserManualDialog(for: manualText)
@@ -1549,8 +1577,9 @@ extension AppDelegate: ClipboardHistoryCore.HotkeyManagerDelegate {
                     return 
                 }
                 let maxItems = self?.clipboardManager?.getPopupItemCount() ?? 3
+                let timeout = self?.clipboardManager?.getPopupTimeout() ?? 10
                 let currentClipboard = self?.clipboardManager?.getCurrentClipboardItem()
-                self?.clipboardPopup?.show(with: history, maxItems: maxItems, isPinned: false, currentClipboard: currentClipboard)
+                self?.clipboardPopup?.show(with: history, maxItems: maxItems, isPinned: false, currentClipboard: currentClipboard, timeout: timeout)
                 
             case .showPinned:
                 self?.currentMode = .pinned
@@ -1558,8 +1587,9 @@ extension AppDelegate: ClipboardHistoryCore.HotkeyManagerDelegate {
                     return 
                 }
                 let maxItems = self?.clipboardManager?.getPopupItemCount() ?? 3
+                let timeout = self?.clipboardManager?.getPopupTimeout() ?? 10
                 let currentClipboard = self?.clipboardManager?.getCurrentClipboardItem()
-                self?.clipboardPopup?.show(with: pinnedItems, maxItems: maxItems, isPinned: true, currentClipboard: currentClipboard)
+                self?.clipboardPopup?.show(with: pinnedItems, maxItems: maxItems, isPinned: true, currentClipboard: currentClipboard, timeout: timeout)
             }
         }
     }
