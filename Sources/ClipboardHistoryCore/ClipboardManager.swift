@@ -8,12 +8,15 @@ public protocol ClipboardManagerDelegate: AnyObject {
 public class ClipboardManager {
     public weak var delegate: ClipboardManagerDelegate?
     private var clipboardHistory: [String] = []
+    private var pinnedItems: [String] = []
     private var timer: Timer?
     private var lastClipboardContent: String = ""
     private let maxHistorySize = 20
+    private let maxPinnedSize = 10
     
     private let pasteboard = NSPasteboard.general
     private let historyKey = "ClipboardHistory"
+    private let pinnedKey = "ClipboardPinned"
     private let popupItemCountKey = "PopupItemCount"
     private let defaultPopupItemCount = 3
     
@@ -22,6 +25,7 @@ public class ClipboardManager {
     public func startMonitoring() {
         // Load saved history from UserDefaults
         loadHistory()
+        loadPinnedItems()
         
         // Get initial clipboard content safely
         if let initialContent = getCurrentClipboardContent() {
@@ -77,6 +81,14 @@ public class ClipboardManager {
         return clipboardHistory
     }
     
+    public func getPinnedItems() -> [String] {
+        return pinnedItems
+    }
+    
+    public func getCurrentClipboardItem() -> String? {
+        return getCurrentClipboardContent()
+    }
+    
     public func copyToClipboard(_ content: String) {
         guard !content.isEmpty else { return }
         
@@ -110,15 +122,83 @@ public class ClipboardManager {
         // Just update the last clipboard content to prevent duplicate detection
     }
     
+    public func copyAndPasteItem(_ content: String) {
+        guard !content.isEmpty else { return }
+        
+        // First copy to clipboard
+        copySelectedItem(content)
+        
+        // Then simulate paste (Cmd+V)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.simulatePaste()
+        }
+    }
+    
+    private func simulatePaste() {
+        // Create key event for Cmd+V
+        let source = CGEventSource(stateID: .hidSystemState)
+        
+        // Key down for V with Cmd modifier
+        if let keyDownEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true) {
+            keyDownEvent.flags = .maskCommand
+            keyDownEvent.post(tap: .cghidEventTap)
+        }
+        
+        // Key up for V
+        if let keyUpEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) {
+            keyUpEvent.post(tap: .cghidEventTap)
+        }
+    }
+    
+    public func pinItem(_ content: String) {
+        guard !content.isEmpty else { return }
+        
+        // Remove if already pinned (to move to top)
+        pinnedItems.removeAll { $0 == content }
+        
+        // Add to beginning of pinned items
+        pinnedItems.insert(content, at: 0)
+        
+        // Keep only the max pinned items
+        if pinnedItems.count > maxPinnedSize {
+            pinnedItems = Array(pinnedItems.prefix(maxPinnedSize))
+        }
+        
+        savePinnedItems()
+        delegate?.clipboardDidChange()
+    }
+    
+    public func unpinItem(_ content: String) {
+        pinnedItems.removeAll { $0 == content }
+        savePinnedItems()
+        delegate?.clipboardDidChange()
+    }
+    
+    public func isPinned(_ content: String) -> Bool {
+        return pinnedItems.contains(content)
+    }
+    
     public func clearHistory() {
         clipboardHistory.removeAll()
         saveHistory() // Save the empty history
+    }
+    
+    public func clearPinnedItems() {
+        pinnedItems.removeAll()
+        savePinnedItems()
     }
     
     public func deleteItem(at index: Int) {
         guard index >= 0 && index < clipboardHistory.count else { return }
         clipboardHistory.remove(at: index)
         saveHistory()
+        delegate?.clipboardDidChange()
+    }
+    
+    public func deletePinnedItem(at index: Int) {
+        guard index >= 0 && index < pinnedItems.count else { return }
+        pinnedItems.remove(at: index)
+        savePinnedItems()
         delegate?.clipboardDidChange()
     }
     
@@ -154,9 +234,22 @@ public class ClipboardManager {
         }
     }
     
+    private func savePinnedItems() {
+        UserDefaults.standard.set(pinnedItems, forKey: pinnedKey)
+        UserDefaults.standard.synchronize()
+    }
+    
+    private func loadPinnedItems() {
+        if let savedPinned = UserDefaults.standard.array(forKey: pinnedKey) as? [String] {
+            pinnedItems = savedPinned
+            print("📌 Loaded \(pinnedItems.count) pinned items")
+        }
+    }
+    
     public func saveHistoryOnExit() {
         UserDefaults.standard.set(clipboardHistory, forKey: historyKey)
+        UserDefaults.standard.set(pinnedItems, forKey: pinnedKey)
         UserDefaults.standard.synchronize() // Force immediate save
-        print("💾 History saved on app exit")
+        print("💾 History and pinned items saved on app exit")
     }
 } 

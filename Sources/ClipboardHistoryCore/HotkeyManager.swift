@@ -3,19 +3,38 @@ import AppKit
 import Carbon
 
 public protocol HotkeyManagerDelegate: AnyObject {
-    func hotkeyPressed()
+    func hotkeyPressed(type: HotkeyType)
     func quitHotkeyPressed()
-    func directHotkeyPressed(for index: Int) // For ⌘⌥1-6
+    func directHotkeyPressed(for index: Int, isAutoPaste: Bool) // For ⌘⌥1-6 with auto-paste flag
+}
+
+public enum HotkeyType {
+    case showHistory
+    case showPinned
 }
 
 public class HotkeyManager {
     public weak var delegate: HotkeyManagerDelegate?
-    private var hotKeyRef: EventHotKeyRef?
-    private var quitHotKeyRef: EventHotKeyRef?
-    private var directHotKeyRefs: [EventHotKeyRef?] = Array(repeating: nil, count: 6) // For ⌘⌥1-6
+    private var hotKeyRefs: [String: EventHotKeyRef] = [:]
     private var eventHandler: EventHandlerRef?
+    private var hotkeySettings: HotkeySettings
+    private var isUsingPinnedMode = false
     
-    public init() {}
+    public init() {
+        hotkeySettings = HotkeySettings()
+    }
+    
+    public func getHotkeySettings() -> HotkeySettings {
+        return hotkeySettings
+    }
+    
+    public func setUsingPinnedMode(_ enabled: Bool) {
+        isUsingPinnedMode = enabled
+    }
+    
+    public func isInPinnedMode() -> Bool {
+        return isUsingPinnedMode
+    }
     
     public func registerHotkey() {
         // Create event type for hotkey
@@ -36,15 +55,7 @@ public class HotkeyManager {
                     GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
                     
                     DispatchQueue.main.async {
-                        if hotKeyID.id == 1 {
-                            manager.delegate?.hotkeyPressed()
-                        } else if hotKeyID.id == 2 {
-                            manager.delegate?.quitHotkeyPressed()
-                        } else if hotKeyID.id >= 10 && hotKeyID.id <= 15 {
-                            // Direct hotkeys for clipboard items 1-6 (IDs 10-15) using ⌘⌥1-6
-                            let index = Int(hotKeyID.id) - 10
-                            manager.delegate?.directHotkeyPressed(for: index)
-                        }
+                        manager.handleHotkeyPressed(hotKeyID: hotKeyID)
                     }
                 }
                 return noErr
@@ -60,83 +71,88 @@ public class HotkeyManager {
             return
         }
         
-        // Register the hotkey (Cmd+Shift+C)
-        let hotKeyID = EventHotKeyID(signature: fourCharCode("CBHK"), id: 1)
-        let keyCode: UInt32 = 8 // C key
-        let modifiers = UInt32(cmdKey | shiftKey)
+        // Register all configured hotkeys
+        registerAllHotkeys()
+    }
+    
+    private func handleHotkeyPressed(hotKeyID: EventHotKeyID) {
+        switch hotKeyID.id {
+        case 1: // Show History
+            delegate?.hotkeyPressed(type: .showHistory)
+            setUsingPinnedMode(false)
+        case 2: // Show Pinned
+            delegate?.hotkeyPressed(type: .showPinned)
+            setUsingPinnedMode(true)
+        case 10...15: // Direct hotkeys for clipboard items 1-6 (IDs 10-15)
+            let index = Int(hotKeyID.id) - 10
+            delegate?.directHotkeyPressed(for: index, isAutoPaste: true)
+        default:
+            break
+        }
+    }
+    
+    private func registerAllHotkeys() {
+        // Unregister existing hotkeys first
+        unregisterAllHotkeys()
         
+        // Register show history hotkey
+        if let config = hotkeySettings.getConfig(for: "showHistory") {
+            registerSingleHotkey(id: 1, config: config, name: "Show History")
+        }
+        
+        // Register show pinned hotkey
+        if let config = hotkeySettings.getConfig(for: "showPinned") {
+            registerSingleHotkey(id: 2, config: config, name: "Show Pinned")
+        }
+        
+        // Register direct hotkeys for items 1-6
+        for i in 1...6 {
+            if let config = hotkeySettings.getConfig(for: "directCopy\(i)") {
+                registerSingleHotkey(id: UInt32(9 + i), config: config, name: "Direct Copy \(i)")
+            }
+        }
+    }
+    
+    private func registerSingleHotkey(id: UInt32, config: HotkeyConfig, name: String) {
+        let hotKeyID = EventHotKeyID(signature: fourCharCode("CBHK"), id: id)
+        
+        var hotKeyRef: EventHotKeyRef?
         let registerStatus = RegisterEventHotKey(
-            keyCode,
-            modifiers,
+            config.keyCode,
+            config.modifiers,
             hotKeyID,
             GetApplicationEventTarget(),
             0,
             &hotKeyRef
         )
         
-        if registerStatus == noErr {
-            print("✅ Hotkey ⌘⇧C registered")
+        if registerStatus == noErr, let ref = hotKeyRef {
+            hotKeyRefs[config.id] = ref
+            print("✅ Hotkey \(config.displayString) registered for \(name)")
         } else {
-            print("❌ Failed to register hotkey: \(registerStatus)")
+            print("❌ Failed to register hotkey \(config.displayString) for \(name): \(registerStatus)")
         }
-        
-        // Register direct hotkeys for clipboard items 1-6 (⌘⌥1-6)
-        registerDirectHotkeys()
-        
-        // TODO: Re-enable quit hotkey after fixing crash
-        // Temporarily disabled due to crash issues
     }
     
-    private func registerDirectHotkeys() {
-        // Key codes for numbers 1-6
-        let keyCodes: [UInt32] = [18, 19, 20, 21, 23, 22] // 1, 2, 3, 4, 5, 6
-        let modifiers = UInt32(cmdKey | optionKey)
-        
-        for i in 0..<6 {
-            let hotKeyID = EventHotKeyID(signature: fourCharCode("CBHK"), id: UInt32(10 + i)) // IDs 10-15
-            let keyCode = keyCodes[i]
-            
-            var hotKeyRef: EventHotKeyRef?
-            let registerStatus = RegisterEventHotKey(
-                keyCode,
-                modifiers,
-                hotKeyID,
-                GetApplicationEventTarget(),
-                0,
-                &hotKeyRef
-            )
-            
-            if registerStatus == noErr {
-                directHotKeyRefs[i] = hotKeyRef
-                print("✅ Direct hotkey ⌘⌥\(i + 1) registered")
-            } else {
-                print("❌ Failed to register direct hotkey ⌘⌥\(i + 1): \(registerStatus)")
-            }
-        }
+    public func updateHotkeys() {
+        // Re-register all hotkeys with updated settings
+        registerAllHotkeys()
     }
     
     public func unregisterHotkey() {
-        if let hotKeyRef = hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
-            self.hotKeyRef = nil
-        }
-        if let quitHotKeyRef = quitHotKeyRef {
-            UnregisterEventHotKey(quitHotKeyRef)
-            self.quitHotKeyRef = nil
-        }
-        
-        // Unregister direct hotkeys
-        for i in 0..<directHotKeyRefs.count {
-            if let hotKeyRef = directHotKeyRefs[i] {
-                UnregisterEventHotKey(hotKeyRef)
-                directHotKeyRefs[i] = nil
-            }
-        }
+        unregisterAllHotkeys()
         
         if let eventHandler = eventHandler {
             RemoveEventHandler(eventHandler)
             self.eventHandler = nil
         }
+    }
+    
+    private func unregisterAllHotkeys() {
+        for (_, hotKeyRef) in hotKeyRefs {
+            UnregisterEventHotKey(hotKeyRef)
+        }
+        hotKeyRefs.removeAll()
     }
     
     deinit {

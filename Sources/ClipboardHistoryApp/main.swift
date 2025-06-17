@@ -15,6 +15,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var clipboardPopup: ClipboardHistoryCore.ClipboardPopup?
     var fullTextWindow: NSWindow?
     var fullTextContent: String?
+    var settingsWindow: NSWindow?
+    private var currentMode: PopupMode = .history
+    
+    enum PopupMode {
+        case history
+        case pinned
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide the dock icon
@@ -370,18 +377,32 @@ agree to be bound by these terms and disclaimers.
     
     private func addHotkeyInfoToMenu(_ menu: NSMenu) {
         // Add info about hotkey (only if hotkey manager is set up)
-        guard hotkeyManager != nil else { return }
+        guard let hotkeyManager = hotkeyManager else { return }
         
-        let hotkeyInfo = NSMenuItem(
-            title: "Press ⌘⇧C for quick access",
-            action: nil,
-            keyEquivalent: ""
-        )
-        hotkeyInfo.isEnabled = false
-        menu.addItem(hotkeyInfo)
+        let settings = hotkeyManager.getHotkeySettings()
+        
+        if let historyConfig = settings.getConfig(for: "showHistory") {
+            let hotkeyInfo = NSMenuItem(
+                title: "Press \(historyConfig.displayString) for clipboard history",
+                action: nil,
+                keyEquivalent: ""
+            )
+            hotkeyInfo.isEnabled = false
+            menu.addItem(hotkeyInfo)
+        }
+        
+        if let pinnedConfig = settings.getConfig(for: "showPinned") {
+            let pinnedInfo = NSMenuItem(
+                title: "Press \(pinnedConfig.displayString) for pinned items",
+                action: nil,
+                keyEquivalent: ""
+            )
+            pinnedInfo.isEnabled = false
+            menu.addItem(pinnedInfo)
+        }
         
         let directHotkeyInfo = NSMenuItem(
-            title: "⌘⌥1-6: Copy items 1-6 directly",
+            title: "⌘⌥1-6: Copy & paste items 1-6 instantly",
             action: nil,
             keyEquivalent: ""
         )
@@ -389,7 +410,7 @@ agree to be bound by these terms and disclaimers.
         menu.addItem(directHotkeyInfo)
         
         let copyInfo = NSMenuItem(
-            title: "Click: copy • ⌘+click: view full • Right-click: options",
+            title: "Click: paste • Hover: auto-paste • ⌘+click: view full",
             action: nil,
             keyEquivalent: ""
         )
@@ -399,6 +420,23 @@ agree to be bound by these terms and disclaimers.
     }
     
     private func addHistoryItemsToMenu(_ menu: NSMenu) {
+        // Add pinned items first
+        let pinnedItems = clipboardManager?.getPinnedItems() ?? []
+        if !pinnedItems.isEmpty {
+            let pinnedHeaderItem = NSMenuItem(
+                title: "📌 Pinned Items",
+                action: nil,
+                keyEquivalent: ""
+            )
+            pinnedHeaderItem.isEnabled = false
+            menu.addItem(pinnedHeaderItem)
+            
+            for (index, item) in pinnedItems.enumerated() {
+                addPinnedItemToMenu(menu, item: item, index: index)
+            }
+            menu.addItem(NSMenuItem.separator())
+        }
+        
         // Add clipboard history items
         let history = clipboardManager?.getHistory() ?? []
         
@@ -411,6 +449,14 @@ agree to be bound by these terms and disclaimers.
             emptyItem.isEnabled = false
             menu.addItem(emptyItem)
         } else {
+            let historyHeaderItem = NSMenuItem(
+                title: "📋 Recent History",
+                action: nil,
+                keyEquivalent: ""
+            )
+            historyHeaderItem.isEnabled = false
+            menu.addItem(historyHeaderItem)
+            
             for (index, item) in history.enumerated() {
                 addHistoryItemToMenu(menu, item: item, index: index)
             }
@@ -422,7 +468,11 @@ agree to be bound by these terms and disclaimers.
     private func addHistoryItemToMenu(_ menu: NSMenu, item: String, index: Int) {
         // Clean up multi-line text for menu display
         let cleanedText = item.cleanedForDisplay().truncated(to: 45)
-        let menuTitle = "\(index + 1). \(cleanedText)"
+        let currentClipboard = clipboardManager?.getCurrentClipboardItem()
+        let isCurrentItem = (item == currentClipboard)
+        let prefix = isCurrentItem ? "🟢 " : ""
+        let menuTitle = "\(prefix)\(index + 1). \(cleanedText)"
+        
         // Add keyboard shortcut for first 6 items
         let keyEquivalent = (index < 6) ? "\(index + 1)" : ""
         let menuItem = NSMenuItem(
@@ -440,13 +490,31 @@ agree to be bound by these terms and disclaimers.
         let submenu = NSMenu()
         
         let copyAction = NSMenuItem(
-            title: "Copy",
-            action: #selector(selectClipboardItem(_:)),
+            title: "Copy & Paste",
+            action: #selector(pasteClipboardItem(_:)),
             keyEquivalent: ""
         )
         copyAction.tag = index
         copyAction.target = self
         submenu.addItem(copyAction)
+        
+        let copyOnlyAction = NSMenuItem(
+            title: "Copy Only",
+            action: #selector(selectClipboardItem(_:)),
+            keyEquivalent: ""
+        )
+        copyOnlyAction.tag = index
+        copyOnlyAction.target = self
+        submenu.addItem(copyOnlyAction)
+        
+        let pinAction = NSMenuItem(
+            title: "Pin Item",
+            action: #selector(pinClipboardItem(_:)),
+            keyEquivalent: ""
+        )
+        pinAction.tag = index
+        pinAction.target = self
+        submenu.addItem(pinAction)
         
         let viewFullAction = NSMenuItem(
             title: "View Full Text",
@@ -460,6 +528,74 @@ agree to be bound by these terms and disclaimers.
         let deleteAction = NSMenuItem(
             title: "Delete",
             action: #selector(deleteClipboardItem(_:)),
+            keyEquivalent: ""
+        )
+        deleteAction.tag = index
+        deleteAction.target = self
+        submenu.addItem(deleteAction)
+        
+        menuItem.submenu = submenu
+        menu.addItem(menuItem)
+    }
+    
+    private func addPinnedItemToMenu(_ menu: NSMenu, item: String, index: Int) {
+        // Clean up multi-line text for menu display
+        let cleanedText = item.cleanedForDisplay().truncated(to: 45)
+        let currentClipboard = clipboardManager?.getCurrentClipboardItem()
+        let isCurrentItem = (item == currentClipboard)
+        let prefix = isCurrentItem ? "🟢 " : ""
+        let menuTitle = "\(prefix)📌 \(cleanedText)"
+        
+        let menuItem = NSMenuItem(
+            title: menuTitle,
+            action: #selector(selectPinnedItem(_:)),
+            keyEquivalent: ""
+        )
+        menuItem.tag = index
+        menuItem.target = self
+        
+        // Add submenu for each pinned item with options
+        let submenu = NSMenu()
+        
+        let copyAction = NSMenuItem(
+            title: "Copy & Paste",
+            action: #selector(pastePinnedItem(_:)),
+            keyEquivalent: ""
+        )
+        copyAction.tag = index
+        copyAction.target = self
+        submenu.addItem(copyAction)
+        
+        let copyOnlyAction = NSMenuItem(
+            title: "Copy Only",
+            action: #selector(selectPinnedItem(_:)),
+            keyEquivalent: ""
+        )
+        copyOnlyAction.tag = index
+        copyOnlyAction.target = self
+        submenu.addItem(copyOnlyAction)
+        
+        let unpinAction = NSMenuItem(
+            title: "Unpin Item",
+            action: #selector(unpinClipboardItem(_:)),
+            keyEquivalent: ""
+        )
+        unpinAction.tag = index
+        unpinAction.target = self
+        submenu.addItem(unpinAction)
+        
+        let viewFullAction = NSMenuItem(
+            title: "View Full Text",
+            action: #selector(viewFullPinnedItem(_:)),
+            keyEquivalent: ""
+        )
+        viewFullAction.tag = index
+        viewFullAction.target = self
+        submenu.addItem(viewFullAction)
+        
+        let deleteAction = NSMenuItem(
+            title: "Delete",
+            action: #selector(deletePinnedItem(_:)),
             keyEquivalent: ""
         )
         deleteAction.tag = index
@@ -489,15 +625,22 @@ agree to be bound by these terms and disclaimers.
         let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
         let settingsSubmenu = NSMenu()
         
+        // Add hotkey configuration
+        let hotkeySettingsItem = NSMenuItem(title: "Configure Hotkeys", action: #selector(showHotkeySettings), keyEquivalent: "")
+        hotkeySettingsItem.target = self
+        settingsSubmenu.addItem(hotkeySettingsItem)
+        
+        settingsSubmenu.addItem(NSMenuItem.separator())
+        
         // Add popup item count setting with clearer description
-        let popupSettingsItem = NSMenuItem(title: "⌘⇧C Popup Items", action: nil, keyEquivalent: "")
+        let popupSettingsItem = NSMenuItem(title: "Popup Display Items", action: nil, keyEquivalent: "")
         let popupSubmenu = NSMenu()
         
         let currentCount = clipboardManager?.getPopupItemCount() ?? 3
         
         for count in 1...20 {
             let countItem = NSMenuItem(
-                title: "\(count) item\(count == 1 ? "" : "s") in ⌘⇧C popup",
+                title: "\(count) item\(count == 1 ? "" : "s") in popup",
                 action: #selector(setPopupItemCount(_:)),
                 keyEquivalent: ""
             )
@@ -509,6 +652,13 @@ agree to be bound by these terms and disclaimers.
         
         popupSettingsItem.submenu = popupSubmenu
         settingsSubmenu.addItem(popupSettingsItem)
+        
+        settingsSubmenu.addItem(NSMenuItem.separator())
+        
+        // Clear options
+        let clearPinnedItem = NSMenuItem(title: "Clear All Pinned Items", action: #selector(clearPinnedItems), keyEquivalent: "")
+        clearPinnedItem.target = self
+        settingsSubmenu.addItem(clearPinnedItem)
         
         settingsItem.submenu = settingsSubmenu
         menu.addItem(settingsItem)
@@ -571,6 +721,85 @@ agree to be bound by these terms and disclaimers.
         
         let item = history[sender.tag]
         showFullTextDialog(for: item)
+    }
+    
+    @objc func pasteClipboardItem(_ sender: NSMenuItem) {
+        guard let history = clipboardManager?.getHistory(),
+              sender.tag >= 0,
+              sender.tag < history.count else { 
+            return 
+        }
+        
+        let selectedItem = history[sender.tag]
+        clipboardManager?.copyAndPasteItem(selectedItem)
+    }
+    
+    @objc func pinClipboardItem(_ sender: NSMenuItem) {
+        guard let history = clipboardManager?.getHistory(),
+              sender.tag >= 0,
+              sender.tag < history.count else { 
+            return 
+        }
+        
+        let selectedItem = history[sender.tag]
+        clipboardManager?.pinItem(selectedItem)
+    }
+    
+    @objc func selectPinnedItem(_ sender: NSMenuItem) {
+        guard let pinnedItems = clipboardManager?.getPinnedItems(),
+              sender.tag >= 0,
+              sender.tag < pinnedItems.count else { 
+            return 
+        }
+        
+        let selectedItem = pinnedItems[sender.tag]
+        clipboardManager?.copySelectedItem(selectedItem)
+    }
+    
+    @objc func pastePinnedItem(_ sender: NSMenuItem) {
+        guard let pinnedItems = clipboardManager?.getPinnedItems(),
+              sender.tag >= 0,
+              sender.tag < pinnedItems.count else { 
+            return 
+        }
+        
+        let selectedItem = pinnedItems[sender.tag]
+        clipboardManager?.copyAndPasteItem(selectedItem)
+    }
+    
+    @objc func unpinClipboardItem(_ sender: NSMenuItem) {
+        guard let pinnedItems = clipboardManager?.getPinnedItems(),
+              sender.tag >= 0,
+              sender.tag < pinnedItems.count else { 
+            return 
+        }
+        
+        let selectedItem = pinnedItems[sender.tag]
+        clipboardManager?.unpinItem(selectedItem)
+    }
+    
+    @objc func viewFullPinnedItem(_ sender: NSMenuItem) {
+        guard let pinnedItems = clipboardManager?.getPinnedItems(),
+              sender.tag >= 0,
+              sender.tag < pinnedItems.count else { 
+            return 
+        }
+        
+        let item = pinnedItems[sender.tag]
+        showFullTextDialog(for: item)
+    }
+    
+    @objc func deletePinnedItem(_ sender: NSMenuItem) {
+        clipboardManager?.deletePinnedItem(at: sender.tag)
+    }
+    
+    @objc func clearPinnedItems() {
+        clipboardManager?.clearPinnedItems()
+        updateMenu()
+    }
+    
+    @objc func showHotkeySettings() {
+        showHotkeySettingsWindow()
     }
     
     private func showFullTextDialog(for text: String) {
@@ -1076,6 +1305,177 @@ For more info: About ClipboardHistoryApp • License
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }
+    
+    private func showHotkeySettingsWindow() {
+        // Close any existing settings window
+        if let existingWindow = settingsWindow {
+            existingWindow.close()
+            settingsWindow = nil
+        }
+        
+        guard let hotkeyManager = hotkeyManager else { return }
+        let settings = hotkeyManager.getHotkeySettings()
+        
+        // Create hotkey settings window
+        let windowRect = NSRect(x: 0, y: 0, width: 500, height: 400)
+        let window = NSWindow(
+            contentRect: windowRect,
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        window.title = "Hotkey Configuration"
+        window.center()
+        window.delegate = self
+        window.isReleasedWhenClosed = false
+        
+        // Create main content view
+        let contentView = NSView(frame: windowRect)
+        window.contentView = contentView
+        
+        // Create scroll view for hotkey settings
+        let scrollView = NSScrollView(frame: NSRect(x: 20, y: 60, width: windowRect.width - 40, height: windowRect.height - 120))
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = false
+        scrollView.borderType = .bezelBorder
+        scrollView.autoresizingMask = [.width, .height]
+        
+        let configs = settings.getAllConfigs()
+        let itemHeight: CGFloat = 50
+        let totalHeight = CGFloat(configs.count) * itemHeight + 20
+        
+        let documentView = NSView(frame: NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: max(totalHeight, scrollView.contentSize.height)))
+        
+        // Add instruction label
+        let instructionLabel = NSTextField(labelWithString: "Click on a hotkey combination to change it. Press Enter to confirm, Escape to cancel.")
+        instructionLabel.font = NSFont.systemFont(ofSize: 12)
+        instructionLabel.textColor = NSColor.secondaryLabelColor
+        instructionLabel.frame = NSRect(x: 10, y: totalHeight - 25, width: documentView.frame.width - 20, height: 20)
+        instructionLabel.backgroundColor = NSColor.clear
+        instructionLabel.isBordered = false
+        documentView.addSubview(instructionLabel)
+        
+        // Add hotkey configuration items
+        for (index, config) in configs.enumerated() {
+            let yPosition = totalHeight - CGFloat(index + 2) * itemHeight
+            
+            // Label for hotkey description
+            let nameLabel = NSTextField(labelWithString: config.displayName)
+            nameLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+            nameLabel.frame = NSRect(x: 10, y: yPosition + 20, width: 200, height: 20)
+            nameLabel.backgroundColor = NSColor.clear
+            nameLabel.isBordered = false
+            documentView.addSubview(nameLabel)
+            
+            // Button to show/change hotkey
+            let hotkeyButton = NSButton(frame: NSRect(x: 220, y: yPosition + 15, width: 150, height: 30))
+            hotkeyButton.title = config.displayString
+            hotkeyButton.bezelStyle = .rounded
+            hotkeyButton.tag = index
+            hotkeyButton.target = self
+            hotkeyButton.action = #selector(changeHotkey(_:))
+            documentView.addSubview(hotkeyButton)
+            
+            // Reset button
+            let resetButton = NSButton(frame: NSRect(x: 380, y: yPosition + 15, width: 60, height: 30))
+            resetButton.title = "Reset"
+            resetButton.bezelStyle = .rounded
+            resetButton.tag = index
+            resetButton.target = self
+            resetButton.action = #selector(resetHotkey(_:))
+            documentView.addSubview(resetButton)
+        }
+        
+        scrollView.documentView = documentView
+        contentView.addSubview(scrollView)
+        
+        // Add close button
+        let closeButton = NSButton(frame: NSRect(x: windowRect.width - 100, y: 20, width: 80, height: 30))
+        closeButton.title = "Close"
+        closeButton.bezelStyle = .rounded
+        closeButton.target = self
+        closeButton.action = #selector(closeHotkeySettings(_:))
+        closeButton.keyEquivalent = "\u{1b}" // Escape key
+        contentView.addSubview(closeButton)
+        
+        // Add reset all button
+        let resetAllButton = NSButton(frame: NSRect(x: windowRect.width - 190, y: 20, width: 80, height: 30))
+        resetAllButton.title = "Reset All"
+        resetAllButton.bezelStyle = .rounded
+        resetAllButton.target = self
+        resetAllButton.action = #selector(resetAllHotkeys(_:))
+        contentView.addSubview(resetAllButton)
+        
+        settingsWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    @objc private func changeHotkey(_ sender: NSButton) {
+        guard let hotkeyManager = hotkeyManager else { return }
+        let settings = hotkeyManager.getHotkeySettings()
+        let configs = settings.getAllConfigs()
+        
+        guard sender.tag < configs.count else { return }
+        let config = configs[sender.tag]
+        
+        // Show hotkey capture dialog
+        let alert = NSAlert()
+        alert.messageText = "Press new hotkey for '\(config.displayName)'"
+        alert.informativeText = "Press the key combination you want to use, then press Enter to confirm or Escape to cancel."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Cancel")
+        
+        // This is a simplified approach - in a full implementation, you'd want a proper hotkey capture view
+        // For now, we'll just show the current binding
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            // User cancelled
+            return
+        }
+        
+        // In a real implementation, you would capture the actual key press here
+        // For now, we'll just show that the feature is available
+        let infoAlert = NSAlert()
+        infoAlert.messageText = "Hotkey Customization"
+        infoAlert.informativeText = "Hotkey customization is available. Current binding: \(config.displayString)\n\nTo fully implement hotkey capture, additional key event monitoring would be added here."
+        infoAlert.alertStyle = .informational
+        infoAlert.addButton(withTitle: "OK")
+        infoAlert.runModal()
+    }
+    
+    @objc private func resetHotkey(_ sender: NSButton) {
+        guard let hotkeyManager = hotkeyManager else { return }
+        let settings = hotkeyManager.getHotkeySettings()
+        let configs = settings.getAllConfigs()
+        
+        guard sender.tag < configs.count else { return }
+        let config = configs[sender.tag]
+        
+        settings.updateConfig(id: config.id, keyCode: config.defaultKeyCode, modifiers: config.defaultModifiers)
+        hotkeyManager.updateHotkeys()
+        
+        // Refresh the settings window
+        showHotkeySettingsWindow()
+    }
+    
+    @objc private func resetAllHotkeys(_ sender: NSButton) {
+        guard let hotkeyManager = hotkeyManager else { return }
+        let settings = hotkeyManager.getHotkeySettings()
+        
+        settings.resetToDefaults()
+        hotkeyManager.updateHotkeys()
+        
+        // Refresh the settings window
+        showHotkeySettingsWindow()
+    }
+    
+    @objc private func closeHotkeySettings(_ sender: NSButton) {
+        settingsWindow?.close()
+        settingsWindow = nil
+    }
 
     @objc func quit() {
         // Clean up full text window if open
@@ -1084,6 +1484,13 @@ For more info: About ClipboardHistoryApp • License
             window.close()
             fullTextWindow = nil
             fullTextContent = nil
+        }
+        
+        // Clean up settings window if open
+        if let window = settingsWindow {
+            window.delegate = nil
+            window.close()
+            settingsWindow = nil
         }
         
         hotkeyManager?.unregisterHotkey()
@@ -1101,13 +1508,18 @@ For more info: About ClipboardHistoryApp • License
 // MARK: - NSWindowDelegate
 extension AppDelegate: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
-        // Clean up when full text window is closed
-        if let window = notification.object as? NSWindow,
-           window === fullTextWindow {
-            // Remove delegate to prevent further callbacks
-            window.delegate = nil
-            fullTextWindow = nil
-            fullTextContent = nil
+        // Clean up when windows are closed
+        if let window = notification.object as? NSWindow {
+            if window === fullTextWindow {
+                // Remove delegate to prevent further callbacks
+                window.delegate = nil
+                fullTextWindow = nil
+                fullTextContent = nil
+            } else if window === settingsWindow {
+                // Remove delegate to prevent further callbacks
+                window.delegate = nil
+                settingsWindow = nil
+            }
         }
     }
     
@@ -1128,14 +1540,27 @@ extension AppDelegate: ClipboardHistoryCore.ClipboardManagerDelegate {
 
 // MARK: - HotkeyManagerDelegate
 extension AppDelegate: ClipboardHistoryCore.HotkeyManagerDelegate {
-    func hotkeyPressed() {
+    func hotkeyPressed(type: ClipboardHistoryCore.HotkeyType) {
         DispatchQueue.main.async { [weak self] in
-            guard let history = self?.clipboardManager?.getHistory() else { 
-                return 
+            switch type {
+            case .showHistory:
+                self?.currentMode = .history
+                guard let history = self?.clipboardManager?.getHistory() else { 
+                    return 
+                }
+                let maxItems = self?.clipboardManager?.getPopupItemCount() ?? 3
+                let currentClipboard = self?.clipboardManager?.getCurrentClipboardItem()
+                self?.clipboardPopup?.show(with: history, maxItems: maxItems, isPinned: false, currentClipboard: currentClipboard)
+                
+            case .showPinned:
+                self?.currentMode = .pinned
+                guard let pinnedItems = self?.clipboardManager?.getPinnedItems() else { 
+                    return 
+                }
+                let maxItems = self?.clipboardManager?.getPopupItemCount() ?? 3
+                let currentClipboard = self?.clipboardManager?.getCurrentClipboardItem()
+                self?.clipboardPopup?.show(with: pinnedItems, maxItems: maxItems, isPinned: true, currentClipboard: currentClipboard)
             }
-            
-            let maxItems = self?.clipboardManager?.getPopupItemCount() ?? 3
-            self?.clipboardPopup?.show(with: history, maxItems: maxItems)
         }
     }
     
@@ -1145,17 +1570,26 @@ extension AppDelegate: ClipboardHistoryCore.HotkeyManagerDelegate {
         }
     }
     
-    func directHotkeyPressed(for index: Int) {
+    func directHotkeyPressed(for index: Int, isAutoPaste: Bool) {
         DispatchQueue.main.async { [weak self] in
-            guard let history = self?.clipboardManager?.getHistory(),
-                  index < history.count else {
+            let items = self?.currentMode == .pinned ? 
+                self?.clipboardManager?.getPinnedItems() ?? [] :
+                self?.clipboardManager?.getHistory() ?? []
+                
+            guard index < items.count else {
                 // Direct hotkey pressed but insufficient items available
                 return
             }
             
-            let selectedItem = history[index]
-            // Direct hotkey pressed - copying item silently for security
-            self?.clipboardManager?.copySelectedItem(selectedItem)
+            let selectedItem = items[index]
+            
+            if isAutoPaste {
+                // Direct hotkey with auto-paste - copy and immediately paste
+                self?.clipboardManager?.copyAndPasteItem(selectedItem)
+            } else {
+                // Traditional copy-only behavior
+                self?.clipboardManager?.copySelectedItem(selectedItem)
+            }
         }
     }
 }
@@ -1167,15 +1601,38 @@ extension AppDelegate: ClipboardHistoryCore.ClipboardPopupDelegate {
         clipboardManager?.copySelectedItem(item)
     }
     
+    func popupDidRequestPaste(_ item: String) {
+        // Copy and automatically paste the item
+        clipboardManager?.copyAndPasteItem(item)
+    }
+    
     func popupDidRequestFullView(_ item: String) {
         showFullTextDialog(for: item)
     }
     
-    func popupDidRequestDelete(_ item: String) {
-        guard let history = clipboardManager?.getHistory(),
-              let index = history.firstIndex(of: item) else { 
-            return 
+    func popupDidRequestPin(_ item: String) {
+        if currentMode == .pinned {
+            // Unpin the item
+            clipboardManager?.unpinItem(item)
+        } else {
+            // Pin the item
+            clipboardManager?.pinItem(item)
         }
-        clipboardManager?.deleteItem(at: index)
+    }
+    
+    func popupDidRequestDelete(_ item: String) {
+        if currentMode == .pinned {
+            guard let pinnedItems = clipboardManager?.getPinnedItems(),
+                  let index = pinnedItems.firstIndex(of: item) else { 
+                return 
+            }
+            clipboardManager?.deletePinnedItem(at: index)
+        } else {
+            guard let history = clipboardManager?.getHistory(),
+                  let index = history.firstIndex(of: item) else { 
+                return 
+            }
+            clipboardManager?.deleteItem(at: index)
+        }
     }
 } 

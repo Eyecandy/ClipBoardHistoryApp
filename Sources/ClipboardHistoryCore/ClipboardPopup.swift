@@ -5,23 +5,45 @@ public protocol ClipboardPopupDelegate: AnyObject {
     func popupDidSelectItem(_ item: String)
     func popupDidRequestFullView(_ item: String)
     func popupDidRequestDelete(_ item: String)
+    func popupDidRequestPin(_ item: String)
+    func popupDidRequestPaste(_ item: String) // For direct paste without bringing app to foreground
 }
 
 // Custom view class to handle mouse events and store index
 class ClipboardItemView: NSView {
     var index: Int = 0
+    var isCurrentClipboardItem: Bool = false
+    var isPinnedItem: Bool = false
     weak var popup: ClipboardPopup?
+    private var hoverTimer: Timer?
     
     override func mouseEntered(with event: NSEvent) {
         wantsLayer = true
-        layer?.backgroundColor = NSColor.selectedControlColor.withAlphaComponent(0.3).cgColor
+        if isCurrentClipboardItem {
+            layer?.backgroundColor = NSColor.selectedControlColor.withAlphaComponent(0.5).cgColor
+        } else {
+            layer?.backgroundColor = NSColor.selectedControlColor.withAlphaComponent(0.3).cgColor
+        }
+        
+        // Start hover timer for auto-paste
+        hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: false) { [weak self] _ in
+            self?.handleHoverTimeout()
+        }
         
         // Notify popup that mouse is inside
         popup?.mouseEnteredPopup()
     }
     
     override func mouseExited(with event: NSEvent) {
-        layer?.backgroundColor = NSColor.clear.cgColor
+        // Cancel hover timer
+        hoverTimer?.invalidate()
+        hoverTimer = nil
+        
+        if isCurrentClipboardItem {
+            layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.2).cgColor
+        } else {
+            layer?.backgroundColor = NSColor.clear.cgColor
+        }
         
         // Check if mouse is still within popup bounds
         if let popup = popup, let window = popup.window {
@@ -35,6 +57,19 @@ class ClipboardItemView: NSView {
         }
     }
     
+    private func handleHoverTimeout() {
+        // Auto-paste after hovering for 0.8 seconds
+        popup?.itemHovered(at: index)
+    }
+    
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 36 { // Enter key
+            popup?.itemEnterPressed(at: index)
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+    
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.command) {
             // Command+click to view full text
@@ -43,8 +78,8 @@ class ClipboardItemView: NSView {
             // Double-click to view full text (keep as fallback)
             popup?.itemDoubleClicked(at: index)
         } else {
-            // Single click to copy
-            popup?.itemClicked(at: index)
+            // Single click to paste directly
+            popup?.itemClickedForPaste(at: index)
         }
     }
     
@@ -67,12 +102,18 @@ class ClipboardItemView: NSView {
         )
         addTrackingArea(trackingArea)
     }
+    
+    override var acceptsFirstResponder: Bool {
+        return true
+    }
 }
 
 public class ClipboardPopup: NSObject {
     public weak var delegate: ClipboardPopupDelegate?
     private(set) var window: NSWindow?
     private var clipboardItems: [String] = []
+    private var isPinnedMode: Bool = false
+    private var currentClipboardItem: String?
     private var eventMonitor: Any?
     private var previousActiveApp: NSRunningApplication?
     private var autoHideTimer: Timer?
@@ -82,7 +123,7 @@ public class ClipboardPopup: NSObject {
         super.init()
     }
     
-    public func show(with items: [String], maxItems: Int = 3) {
+    public func show(with items: [String], maxItems: Int = 3, isPinned: Bool = false, currentClipboard: String? = nil) {
         hide() // Hide any existing popup
         
         // Capture the currently active app before showing popup
@@ -90,6 +131,9 @@ public class ClipboardPopup: NSObject {
         
         let validatedMaxItems = max(1, min(20, maxItems))
         clipboardItems = Array(items.prefix(validatedMaxItems))
+        isPinnedMode = isPinned
+        currentClipboardItem = currentClipboard
+        
         guard !clipboardItems.isEmpty else { 
             return 
         }
@@ -144,6 +188,42 @@ public class ClipboardPopup: NSObject {
         restorePreviousAppFocus()
     }
     
+    func itemClickedForPaste(at index: Int) {
+        guard index < clipboardItems.count else { 
+            return 
+        }
+        let selectedItem = clipboardItems[index]
+        delegate?.popupDidRequestPaste(selectedItem)
+        hide()
+        
+        // Restore focus immediately for paste operation
+        restorePreviousAppFocus()
+    }
+    
+    func itemHovered(at index: Int) {
+        guard index < clipboardItems.count else { 
+            return 
+        }
+        let selectedItem = clipboardItems[index]
+        delegate?.popupDidRequestPaste(selectedItem)
+        hide()
+        
+        // Restore focus immediately for paste operation
+        restorePreviousAppFocus()
+    }
+    
+    func itemEnterPressed(at index: Int) {
+        guard index < clipboardItems.count else { 
+            return 
+        }
+        let selectedItem = clipboardItems[index]
+        delegate?.popupDidRequestPaste(selectedItem)
+        hide()
+        
+        // Restore focus immediately for paste operation
+        restorePreviousAppFocus()
+    }
+    
     func itemDoubleClicked(at index: Int) {
         guard index < clipboardItems.count else { 
             return 
@@ -173,7 +253,12 @@ public class ClipboardPopup: NSObject {
     private func showContextMenu(for item: String, at index: Int, event: NSEvent) {
         let menu = NSMenu()
         
-        let copyItem = NSMenuItem(title: "Copy", action: #selector(contextMenuCopy), keyEquivalent: "")
+        let pasteItem = NSMenuItem(title: "Paste", action: #selector(contextMenuPaste), keyEquivalent: "")
+        pasteItem.representedObject = item
+        pasteItem.target = self
+        menu.addItem(pasteItem)
+        
+        let copyItem = NSMenuItem(title: "Copy Only", action: #selector(contextMenuCopy), keyEquivalent: "")
         copyItem.representedObject = item
         copyItem.target = self
         menu.addItem(copyItem)
@@ -189,12 +274,32 @@ public class ClipboardPopup: NSObject {
         
         menu.addItem(NSMenuItem.separator())
         
+        // Pin/Unpin option
+        if isPinnedMode {
+            let unpinItem = NSMenuItem(title: "Unpin", action: #selector(contextMenuUnpin), keyEquivalent: "")
+            unpinItem.representedObject = item
+            unpinItem.target = self
+            menu.addItem(unpinItem)
+        } else {
+            let pinItem = NSMenuItem(title: "Pin Item", action: #selector(contextMenuPin), keyEquivalent: "")
+            pinItem.representedObject = item
+            pinItem.target = self
+            menu.addItem(pinItem)
+        }
+        
         let deleteItem = NSMenuItem(title: "Delete", action: #selector(contextMenuDelete), keyEquivalent: "")
         deleteItem.representedObject = item
         deleteItem.target = self
         menu.addItem(deleteItem)
         
         NSMenu.popUpContextMenu(menu, with: event, for: window?.contentView ?? NSView())
+    }
+    
+    @objc private func contextMenuPaste(_ sender: NSMenuItem) {
+        guard let item = sender.representedObject as? String else { return }
+        delegate?.popupDidRequestPaste(item)
+        hide()
+        restorePreviousAppFocus()
     }
     
     @objc private func contextMenuCopy(_ sender: NSMenuItem) {
@@ -210,6 +315,20 @@ public class ClipboardPopup: NSObject {
     @objc private func contextMenuViewFull(_ sender: NSMenuItem) {
         if let item = sender.representedObject as? String {
             delegate?.popupDidRequestFullView(item)
+            hide()
+        }
+    }
+    
+    @objc private func contextMenuUnpin(_ sender: NSMenuItem) {
+        if let item = sender.representedObject as? String {
+            delegate?.popupDidRequestPin(item)
+            hide()
+        }
+    }
+    
+    @objc private func contextMenuPin(_ sender: NSMenuItem) {
+        if let item = sender.representedObject as? String {
+            delegate?.popupDidRequestPin(item)
             hide()
         }
     }
@@ -427,9 +546,11 @@ public class ClipboardPopup: NSObject {
         let containerView = ClipboardItemView(frame: frame)
         containerView.index = index
         containerView.popup = self
+        containerView.isCurrentClipboardItem = (item == currentClipboardItem)
+        containerView.isPinnedItem = isPinnedMode
         
         addSeparatorIfNeeded(to: containerView, index: index, frame: frame)
-        styleContainerView(containerView)
+        styleContainerView(containerView, isCurrentItem: containerView.isCurrentClipboardItem)
         addLabelsToContainer(containerView, item: item, frame: frame)
         
         return containerView
@@ -447,12 +568,20 @@ public class ClipboardPopup: NSObject {
         }
     }
     
-    private func styleContainerView(_ containerView: ClipboardItemView) {
+    private func styleContainerView(_ containerView: ClipboardItemView, isCurrentItem: Bool) {
         // Add background for better visibility
         containerView.wantsLayer = true
-        containerView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-        containerView.layer?.borderColor = NSColor.separatorColor.cgColor
-        containerView.layer?.borderWidth = 0.5
+        
+        if isCurrentItem {
+            // Highlight current clipboard item with blue background
+            containerView.layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.2).cgColor
+            containerView.layer?.borderColor = NSColor.systemBlue.cgColor
+            containerView.layer?.borderWidth = 1.5
+        } else {
+            containerView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            containerView.layer?.borderColor = NSColor.separatorColor.cgColor
+            containerView.layer?.borderWidth = 0.5
+        }
     }
     
     private func addLabelsToContainer(_ containerView: ClipboardItemView, item: String, frame: NSRect) {
@@ -481,8 +610,8 @@ public class ClipboardPopup: NSObject {
         
         // Add click instruction with dynamic hotkey info
         let instructionText = containerView.index < 6 ? 
-            "Click: copy • ⌘+click: view full • ⌘⌥\(containerView.index + 1): direct copy" :
-            "Click: copy • ⌘+click: view full • Right-click: options"
+            "Click: paste • Hover: auto-paste • ⌘⌥\(containerView.index + 1): paste instantly" :
+            "Click: paste • Hover: auto-paste • ⌘+click: view full"
         let instructionLabel = NSTextField(labelWithString: instructionText)
         instructionLabel.font = NSFont.systemFont(ofSize: 9)
         instructionLabel.textColor = NSColor.secondaryLabelColor
