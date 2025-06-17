@@ -18,7 +18,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsWindow: NSWindow?
     private var currentMode: PopupMode = .history
     private var isHistoryCollapsed: Bool = false
+    private var isPinnedCollapsed: Bool = false
     private let maxMenuHistoryItems: Int = 10
+    private let maxMenuPinnedItems: Int = 10
+    private var previewWindow: NSWindow?
+    private var previewIndex: Int?
+    private var previewTimer: Timer?
     
     enum PopupMode {
         case history
@@ -412,7 +417,7 @@ agree to be bound by these terms and disclaimers.
         menu.addItem(directHotkeyInfo)
         
         let copyInfo = NSMenuItem(
-            title: "Click: copy • Hover+⌘V: paste • ⌘+click: view full",
+            title: "Click: copy • Hover+⌘V: paste • ⌘+click or right-click: full text",
             action: nil,
             keyEquivalent: ""
         )
@@ -425,17 +430,7 @@ agree to be bound by these terms and disclaimers.
         // Add pinned items first
         let pinnedItems = clipboardManager?.getPinnedItems() ?? []
         if !pinnedItems.isEmpty {
-            let pinnedHeaderItem = NSMenuItem(
-                title: "📌 Pinned Items",
-                action: nil,
-                keyEquivalent: ""
-            )
-            pinnedHeaderItem.isEnabled = false
-            menu.addItem(pinnedHeaderItem)
-            
-            for (index, item) in pinnedItems.enumerated() {
-                addPinnedItemToMenu(menu, item: item, index: index)
-            }
+            addCollapsiblePinnedToMenu(menu, pinnedItems: pinnedItems)
             menu.addItem(NSMenuItem.separator())
         }
         
@@ -498,7 +493,87 @@ agree to be bound by these terms and disclaimers.
     
     @objc private func toggleHistoryCollapse() {
         isHistoryCollapsed.toggle()
+        // Update menu without closing it
+        updateMenuWithoutClosing()
+    }
+    
+    @objc private func togglePinnedCollapse() {
+        isPinnedCollapsed.toggle()
+        // Update menu without closing it
+        updateMenuWithoutClosing()
+    }
+    
+    private func updateMenuWithoutClosing() {
+        // Simply update the menu in place - the menu should remain open
+        // during the update for toggle actions
         updateMenu()
+    }
+    
+    private func addCollapsiblePinnedToMenu(_ menu: NSMenu, pinnedItems: [String]) {
+        let chevron = isPinnedCollapsed ? "▶︎" : "▼"
+        let pinnedHeaderItem = NSMenuItem(
+            title: "\(chevron) Pinned Items (\(pinnedItems.count))",
+            action: #selector(togglePinnedCollapse),
+            keyEquivalent: ""
+        )
+        pinnedHeaderItem.target = self
+        menu.addItem(pinnedHeaderItem)
+        
+        if !isPinnedCollapsed {
+            // Show limited items with scrolling option
+            let visibleItems = Array(pinnedItems.prefix(maxMenuPinnedItems))
+            
+            for (index, item) in visibleItems.enumerated() {
+                addPinnedItemToMenu(menu, item: item, index: index)
+            }
+            
+            // Add "More..." item if there are additional items
+            if pinnedItems.count > maxMenuPinnedItems {
+                let moreItem = NSMenuItem(
+                    title: "... \(pinnedItems.count - maxMenuPinnedItems) more pinned items (hover to view)",
+                    action: nil,
+                    keyEquivalent: ""
+                )
+                moreItem.isEnabled = false
+                
+                // Create submenu for remaining items
+                let remainingSubmenu = NSMenu()
+                for (index, item) in pinnedItems.dropFirst(maxMenuPinnedItems).enumerated() {
+                    let adjustedIndex = index + maxMenuPinnedItems
+                    addScrollablePinnedItemToMenu(remainingSubmenu, item: item, index: adjustedIndex)
+                }
+                moreItem.submenu = remainingSubmenu
+                menu.addItem(moreItem)
+            }
+        }
+    }
+    
+    private func addScrollablePinnedItemToMenu(_ menu: NSMenu, item: String, index: Int) {
+        // Simplified menu item for scrollable section (no submenu)
+        let cleanedText = item.cleanedForDisplay().truncated(to: 40)
+        let currentClipboard = clipboardManager?.getCurrentClipboardItem()
+        let isCurrentItem = (item == currentClipboard)
+        
+        let menuTitle: NSAttributedString
+        if isCurrentItem {
+            let fullText = "● 📌 \(cleanedText)"
+            let attributedString = NSMutableAttributedString(string: fullText)
+            let mintGreen = NSColor(red: 0.0, green: 0.784, blue: 0.588, alpha: 1.0)
+            attributedString.addAttribute(.foregroundColor, value: mintGreen, range: NSRange(location: 0, length: 1))
+            menuTitle = attributedString
+        } else {
+            menuTitle = NSAttributedString(string: "📌 \(cleanedText)")
+        }
+        
+        let menuItem = NSMenuItem(
+            title: "",
+            action: #selector(selectPinnedItem(_:)),
+            keyEquivalent: ""
+        )
+        menuItem.attributedTitle = menuTitle
+        menuItem.tag = index
+        menuItem.target = self
+        menu.addItem(menuItem)
     }
     
     private func addScrollableHistoryItemToMenu(_ menu: NSMenu, item: String, index: Int) {
@@ -778,9 +853,9 @@ agree to be bound by these terms and disclaimers.
         menu.addItem(NSMenuItem.separator())
         
         // Add user manual option
-        let manualItem = NSMenuItem(title: "User Manual", action: #selector(showUserManual), keyEquivalent: "")
-        manualItem.target = self
-        menu.addItem(manualItem)
+        let guideItem = NSMenuItem(title: "📖 Quick Guide", action: #selector(showQuickGuide), keyEquivalent: "")
+        guideItem.target = self
+        menu.addItem(guideItem)
         
         // Add about/license option
         let aboutItem = NSMenuItem(title: "About ClipboardHistoryApp", action: #selector(showAbout), keyEquivalent: "")
@@ -1258,51 +1333,174 @@ agree to be bound by these terms and disclaimers.
         NSApp.activate(ignoringOtherApps: true)
     }
     
-    @objc func showUserManual() {
-        let manualText = """
-ClipboardHistoryApp - Quick Reference
+    @objc func showQuickGuide() {
+        let guideText = """
+📋 ClipboardHistoryApp - Complete Guide
 
-🚀 INSTANT PASTE HOTKEYS
-⌘⌥1-6    Copy & paste items 1-6 instantly
+═══════════════════════════════════════════════════════════════════════════════
 
-🎯 POPUP HOTKEYS  
+🚀 QUICK START
+⌘⇧C → Show clipboard history
+⌘⇧P → Show pinned items  
+⌘⌥1-6 → Instant copy & paste
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 HOTKEYS OVERVIEW
+
+📋 POPUP COMMANDS
 ⌘⇧C      Show clipboard history popup
-⌘⇧P      Show pinned items popup (configurable)
+⌘⇧P      Show pinned items popup
+
+⚡ INSTANT PASTE (Smart Context-Aware)
+⌘⌥1      Copy & paste item #1 from current mode
+⌘⌥2      Copy & paste item #2 from current mode  
+⌘⌥3      Copy & paste item #3 from current mode
+⌘⌥4      Copy & paste item #4 from current mode
+⌘⌥5      Copy & paste item #5 from current mode
+⌘⌥6      Copy & paste item #6 from current mode
+
+💡 SMART MODE SWITCHING
+The ⌘⌥1-6 hotkeys remember your last mode:
+• Use ⌘⇧C first → ⌘⌥1-6 picks from clipboard history
+• Use ⌘⇧P first → ⌘⌥1-6 picks from pinned items
+
+═══════════════════════════════════════════════════════════════════════════════
 
 ✨ POPUP INTERACTIONS
-Click              Paste directly
-Hover + ⌘V         Copy item, then paste with ⌘V
-⌘+Click            View full text
-Right-click        Context menu (pin/unpin/delete)
 
-📌 PINNED ITEMS
-• Pin frequently used items for permanent access
+🖱️ MOUSE ACTIONS
+Click                Copy to clipboard (manual ⌘V to paste)
+⌘+Click             View full text in scrollable window
+Right-Click          Context menu (copy, paste, pin, delete, view)
+Hover+⌘V            Copy on hover, paste with ⌘V
+
+⏱️ PREVIEW FEATURE (NEW!)
+Hold ⌘⌥1-6         Shows preview window after 0.5 seconds
+                    Auto-executes paste after 2 seconds if held
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📌 PINNED ITEMS SYSTEM
+
+🎯 PINNING ITEMS
 • Right-click any item → "Pin Item"
-• ⌘⌥1-6 picks from current mode (history or pinned)
+• Pin frequently used text, code snippets, addresses
+• Maximum 10 pinned items (auto-managed)
+• Pinned items persist across app restarts
 
-⚙️ CUSTOMIZATION
-Menu Bar → Settings:
-• Configure Hotkeys - Change any hotkey combination  
-• Popup Display Items - 1-20 items shown
-• Auto-Hide Timeout - 0-5 minutes (0 = never)
+📂 SMART ORGANIZATION
+• Recent History: Latest 20 copied items
+• Pinned Items: Your permanent collection
+• Smart collapsible menus (click ▶︎/▼ to expand/collapse)
+• Scrollable "More..." sections for 10+ items
 
-🎯 VISUAL CUES
-🟢 Current clipboard item (highlighted everywhere)
-📌 Pinned items section
-📋 Recent history section
+═══════════════════════════════════════════════════════════════════════════════
 
-💡 WORKFLOW TIPS
-• Pin code snippets, common phrases, addresses
-• Use history for recent research, quotes, notes
-• ⌘⌥1-6 works in both modes - switch with ⌘⇧C/⌘⇧P
+🎨 VISUAL INDICATORS
 
-🔒 PRIVACY: Local storage only • No cloud sync • No permissions needed
+● Mint green dot    Current clipboard item (what's currently copied)
+📌 Pin icon         Pinned items
+📋 Clipboard icon   Recent history  
+▶︎ Collapsed        Section hidden (click to expand)
+▼ Expanded          Section visible (click to collapse)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚙️ CUSTOMIZATION OPTIONS
+
+🎛️ HOTKEY CONFIGURATION
+Menu → Settings → Configure Hotkeys
+• Change any hotkey combination
+• Reset individual hotkeys or all to defaults
+• Visual key combination display
+
+🖥️ DISPLAY SETTINGS  
+Menu → Settings → Popup Display Items
+• 1-20 items shown in popup (default: 3)
+• Affects both history and pinned popups
+
+⏰ AUTO-HIDE TIMEOUT
+Menu → Settings → Popup Auto-Hide Timeout  
+• Never, 5s, 10s, 15s, 30s, 1m, 2m, 5m
+• 0 = Never hide automatically (manual dismiss only)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💡 PRO WORKFLOW TIPS
+
+🔧 FOR DEVELOPERS
+• Pin API endpoints, common imports, boilerplate code
+• Use history for debugging output, stack traces
+• Quick switch: ⌘⇧P for templates, ⌘⇧C for recent research
+
+📝 FOR WRITERS  
+• Pin signatures, addresses, common phrases
+• Use history for research quotes, references
+• Hover+⌘V workflow for careful text placement
+
+📊 FOR PRODUCTIVITY
+• Pin meeting links, phone numbers, email templates
+• Use collapsible menus to organize workspace
+• Preview feature helps avoid wrong pastes
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔒 PRIVACY & SECURITY
+
+✅ COMPLETELY PRIVATE
+• All data stored locally on your Mac
+• No cloud sync or external servers
+• No internet connection required
+• No permissions needed beyond accessibility
+
+📁 LOCAL STORAGE
+• History: ~/.userdefaults (ClipboardHistoryApp domain)
+• Automatic cleanup of old items
+• Secure deletion when items are removed
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🆘 TROUBLESHOOTING
+
+🔧 COMMON ISSUES
+Hotkeys not working → Check System Preferences → Security & Privacy
+Popup doesn't show → Try restarting the app
+Items not saving → Check available disk space
+
+🔄 RESET OPTIONS
+Menu → Reset Disclaimer → Restores first-run welcome
+Settings → Reset All Hotkeys → Restores default key combinations
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎉 ADVANCED FEATURES
+
+🎪 INTERACTIVE MENUS
+• Click to collapse/expand sections
+• Hover over "More..." for additional items
+• Smart context-aware actions
+
+⚡ PERFORMANCE
+• Instant clipboard access
+• Minimal memory footprint  
+• Optimized for 24/7 operation
+
+🔧 EXTENSIBILITY
+• Configurable item limits
+• Flexible timeout settings
+• Customizable hotkey combinations
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Made with ❤️ for productivity enthusiasts
+Version: Latest • Local-first • Privacy-focused
 """
         
-        showUserManualDialog(for: manualText)
+        showQuickGuideDialog(for: guideText)
     }
     
-    private func showUserManualDialog(for text: String) {
+    private func showQuickGuideDialog(for text: String) {
         // Close any existing full text window first
         if let existingWindow = fullTextWindow {
             existingWindow.close()
@@ -1319,7 +1517,7 @@ Menu Bar → Settings:
             defer: false
         )
         
-        window.title = "User Manual - ClipboardHistoryApp"
+        window.title = "📖 Quick Guide - ClipboardHistoryApp"
         window.center()
         window.minSize = NSSize(width: 500, height: 400)
         window.delegate = self
@@ -1392,7 +1590,7 @@ Menu Bar → Settings:
         contentView.addSubview(closeButton)
         
         // Add character count label
-        let charCountLabel = NSTextField(labelWithString: "User Manual - \(text.count) characters")
+        let charCountLabel = NSTextField(labelWithString: "Quick Guide - \(text.count) characters")
         charCountLabel.font = NSFont.systemFont(ofSize: 11)
         charCountLabel.textColor = NSColor.secondaryLabelColor
         charCountLabel.frame = NSRect(x: 20, y: buttonY + 8, width: 300, height: 16)
@@ -1455,23 +1653,25 @@ Menu Bar → Settings:
         scrollView.autoresizingMask = [.width, .height]
         
         let configs = settings.getAllConfigs()
-        let itemHeight: CGFloat = 50
-        let totalHeight = CGFloat(configs.count) * itemHeight + 20
+        let itemHeight: CGFloat = 60
+        let instructionHeight: CGFloat = 40
+        let totalHeight = CGFloat(configs.count) * itemHeight + instructionHeight + 40 // Extra padding
         
-        let documentView = NSView(frame: NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: max(totalHeight, scrollView.contentSize.height)))
+        let documentView = NSView(frame: NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: totalHeight))
         
-        // Add instruction label
+        // Add instruction label at the top
         let instructionLabel = NSTextField(labelWithString: "Click on a hotkey combination to change it. Press Enter to confirm, Escape to cancel.")
         instructionLabel.font = NSFont.systemFont(ofSize: 12)
         instructionLabel.textColor = NSColor.secondaryLabelColor
-        instructionLabel.frame = NSRect(x: 10, y: totalHeight - 25, width: documentView.frame.width - 20, height: 20)
+        instructionLabel.frame = NSRect(x: 10, y: totalHeight - instructionHeight, width: documentView.frame.width - 20, height: instructionHeight)
         instructionLabel.backgroundColor = NSColor.clear
         instructionLabel.isBordered = false
+        instructionLabel.lineBreakMode = .byWordWrapping
         documentView.addSubview(instructionLabel)
         
-        // Add hotkey configuration items
+        // Add hotkey configuration items (from top to bottom)
         for (index, config) in configs.enumerated() {
-            let yPosition = totalHeight - CGFloat(index + 2) * itemHeight
+            let yPosition = totalHeight - instructionHeight - CGFloat(index + 1) * itemHeight
             
             // Label for hotkey description
             let nameLabel = NSTextField(labelWithString: config.displayName)
@@ -1588,8 +1788,118 @@ Menu Bar → Settings:
         settingsWindow?.close()
         settingsWindow = nil
     }
+    
+    private func showPreview(for index: Int) {
+        let items = currentMode == .pinned ? 
+            clipboardManager?.getPinnedItems() ?? [] :
+            clipboardManager?.getHistory() ?? []
+            
+        guard index < items.count else { return }
+        
+        let selectedItem = items[index]
+        previewIndex = index
+        
+        // Hide existing preview if any
+        hidePreview()
+        
+        // Create preview window
+        let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        let windowSize = NSSize(width: 400, height: 120)
+        let windowOrigin = NSPoint(
+            x: screenFrame.midX - windowSize.width / 2,
+            y: screenFrame.midY + 100 // Slightly above center
+        )
+        
+        let windowRect = NSRect(origin: windowOrigin, size: windowSize)
+        let window = NSWindow(
+            contentRect: windowRect,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        
+        window.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.95)
+        window.level = .modalPanel
+        window.hasShadow = true
+        window.isOpaque = false
+        
+        // Add rounded corners and border
+        window.contentView?.wantsLayer = true
+        window.contentView?.layer?.cornerRadius = 12
+        window.contentView?.layer?.borderWidth = 2
+        window.contentView?.layer?.borderColor = NSColor.systemBlue.cgColor
+        window.contentView?.layer?.masksToBounds = true
+        
+        // Create content view
+        let contentView = NSView(frame: NSRect(origin: .zero, size: windowSize))
+        contentView.wantsLayer = true
+        window.contentView = contentView
+        
+        // Add title
+        let titleLabel = NSTextField(labelWithString: "Preview: \(currentMode == .pinned ? "Pinned" : "History") Item \(index + 1)")
+        titleLabel.font = NSFont.boldSystemFont(ofSize: 14)
+        titleLabel.textColor = NSColor.labelColor
+        titleLabel.frame = NSRect(x: 20, y: windowSize.height - 35, width: windowSize.width - 40, height: 20)
+        titleLabel.backgroundColor = NSColor.clear
+        contentView.addSubview(titleLabel)
+        
+        // Add preview text
+        let previewText = selectedItem.cleanedForDisplay().truncated(to: 60)
+        let previewLabel = NSTextField(labelWithString: previewText)
+        previewLabel.font = NSFont.systemFont(ofSize: 12)
+        previewLabel.textColor = NSColor.secondaryLabelColor
+        previewLabel.frame = NSRect(x: 20, y: 45, width: windowSize.width - 40, height: 40)
+        previewLabel.backgroundColor = NSColor.clear
+        previewLabel.lineBreakMode = .byWordWrapping
+        previewLabel.maximumNumberOfLines = 2
+        contentView.addSubview(previewLabel)
+        
+        // Add instruction
+        let instructionLabel = NSTextField(labelWithString: "Release to paste • Hold another ⌘⌥(1-6) to switch")
+        instructionLabel.font = NSFont.systemFont(ofSize: 10)
+        instructionLabel.textColor = NSColor.tertiaryLabelColor
+        instructionLabel.frame = NSRect(x: 20, y: 15, width: windowSize.width - 40, height: 15)
+        instructionLabel.backgroundColor = NSColor.clear
+        instructionLabel.alignment = .center
+        contentView.addSubview(instructionLabel)
+        
+        previewWindow = window
+        
+        // Show with animation
+        window.alphaValue = 0
+        window.orderFront(nil)
+        
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            window.animator().alphaValue = 1.0
+        }
+        
+        // If popup is visible, add visual highlight
+        if let popup = clipboardPopup, popup.isVisible() {
+            // This would require additional popup enhancement
+            // For now, just show the preview window
+        }
+    }
+    
+    private func hidePreview() {
+        guard let window = previewWindow else { return }
+        
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.15
+            window.animator().alphaValue = 0
+        }) {
+            window.orderOut(nil)
+            self.previewWindow = nil
+            self.previewIndex = nil
+        }
+    }
 
     @objc func quit() {
+        // Clean up preview window if open
+        hidePreview()
+        previewTimer?.invalidate()
+        previewTimer = nil
+        
         // Clean up full text window if open
         if let window = fullTextWindow {
             window.delegate = nil
@@ -1704,6 +2014,18 @@ extension AppDelegate: ClipboardHistoryCore.HotkeyManagerDelegate {
                 // Traditional copy-only behavior
                 self?.clipboardManager?.copySelectedItem(selectedItem)
             }
+        }
+    }
+    
+    func directHotkeyPreview(for index: Int) {
+        DispatchQueue.main.async { [weak self] in
+            self?.showPreview(for: index)
+        }
+    }
+    
+    func directHotkeyPreviewEnded() {
+        DispatchQueue.main.async { [weak self] in
+            self?.hidePreview()
         }
     }
 }

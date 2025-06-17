@@ -6,6 +6,7 @@ A powerful macOS menu bar app that revolutionizes clipboard management with auto
 
 ### 🚀 **Instant Paste Workflow**
 - **⌘⌥1-6: Instant copy & paste** - Items are copied AND automatically pasted
+- **🔮 Preview on Hold** - Hold ⌘⌥1-6 for 0.5s to see preview before pasting
 - **Click to copy** - Single click in popup copies item to clipboard  
 - **Hover+⌘V to paste** - Hover over item, then press ⌘V to paste
 - **Focus preservation** - Maintains your cursor position in original app
@@ -23,10 +24,12 @@ A powerful macOS menu bar app that revolutionizes clipboard management with auto
 - **Live preview** of current key combinations
 
 ### 🎯 **Smart Visual Feedback**
-- **🟢 Current clipboard item** highlighted everywhere
-- **Blue highlighting** in popups for current item
+- **● Mint green dot** - Current clipboard item indicator (what's currently copied)
+- **Collapsible sections** - Click ▶︎/▼ to expand/collapse history and pinned items
+- **Smart scrolling** - "More..." sections for 10+ items with hover access
 - **Visual mode indicators** (📌 Pinned, 📋 History)
 - **Enhanced hover effects** with clear interaction cues
+- **Animated preview window** for hotkey previews
 
 ### ⏱️ **Configurable Popup Behavior**
 - **Auto-hide timeout**: 0-5 minutes (0 = never hide)
@@ -58,6 +61,7 @@ swift build -c release && swift run
 #### **Instant Paste (Fastest)**
 - **⌘⌥1**: Copy & paste most recent item instantly
 - **⌘⌥2-6**: Copy & paste items 2-6 instantly
+- **Hold ⌘⌥1-6**: Preview window after 0.5s, auto-paste after 2.5s
 - Perfect for repetitive workflows
 
 #### **Popup Selection (Visual)**
@@ -69,9 +73,11 @@ swift build -c release && swift run
 
 #### **Menu Bar Access (Complete)**
 - Click clipboard icon for full menu
-- **🟢 Green dot** shows current clipboard item
-- **📌 Pinned Items** section at top
-- **📋 Recent History** section below
+- **● Mint green dot** shows current clipboard item
+- **📌 Pinned Items** section (collapsible, max 10 visible)
+- **📋 Recent History** section (collapsible, max 10 visible)
+- **Smart "More..." submenus** for items beyond limit
+- **Toggle collapse/expand** without losing menu focus
 
 ### ⚙️ **Customization**
 
@@ -96,11 +102,12 @@ swift build -c release && swift run
 
 | Action | History Popup | Pinned Popup | Menu Items |
 |--------|---------------|--------------|------------|
-| **Click** | Paste directly | Paste directly | Copy & paste |
+| **Click** | Copy to clipboard | Copy to clipboard | Copy to clipboard |
 | **Hover+⌘V** | Copy then paste | Copy then paste | - |
 | **⌘+Click** | View full text | View full text | View full text |
 | **Right-click** | Context menu | Context menu | Submenu |
-| **⌘⌥1-6** | Paste item 1-6 | Paste item 1-6 | - |
+| **⌘⌥1-6** | Copy & paste item 1-6 | Copy & paste item 1-6 | - |
+| **Hold ⌘⌥1-6** | Preview → auto-paste | Preview → auto-paste | - |
 
 ### 🔄 **Workflow Examples**
 

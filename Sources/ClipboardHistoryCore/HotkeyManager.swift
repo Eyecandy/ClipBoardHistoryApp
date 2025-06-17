@@ -6,6 +6,8 @@ public protocol HotkeyManagerDelegate: AnyObject {
     func hotkeyPressed(type: HotkeyType)
     func quitHotkeyPressed()
     func directHotkeyPressed(for index: Int, isAutoPaste: Bool) // For ⌘⌥1-6 with auto-paste flag
+    func directHotkeyPreview(for index: Int) // Preview when key is held
+    func directHotkeyPreviewEnded() // When preview ends
 }
 
 public enum HotkeyType {
@@ -19,6 +21,8 @@ public class HotkeyManager {
     private var eventHandler: EventHandlerRef?
     private var hotkeySettings: HotkeySettings
     private var isUsingPinnedMode = false
+    private var previewTimer: Timer?
+    private var isPreviewActive = false
     
     public init() {
         hotkeySettings = HotkeySettings()
@@ -37,7 +41,7 @@ public class HotkeyManager {
     }
     
     public func registerHotkey() {
-        // Create event type for hotkey
+        // Create event type for hotkey press
         var eventType = EventTypeSpec()
         eventType.eventClass = OSType(kEventClassKeyboard)
         eventType.eventKind = OSType(kEventHotKeyPressed)
@@ -85,7 +89,26 @@ public class HotkeyManager {
             setUsingPinnedMode(true)
         case 10...15: // Direct hotkeys for clipboard items 1-6 (IDs 10-15)
             let index = Int(hotKeyID.id) - 10
-            delegate?.directHotkeyPressed(for: index, isAutoPaste: true)
+            
+            // Cancel any existing preview timer
+            previewTimer?.invalidate()
+            previewTimer = nil
+            
+            // Start preview with short delay
+            previewTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
+                self?.isPreviewActive = true
+                self?.delegate?.directHotkeyPreview(for: index)
+                
+                                 // Auto-hide preview after 2 seconds and execute paste
+                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                     if self?.isPreviewActive == true {
+                         self?.isPreviewActive = false
+                         self?.delegate?.directHotkeyPreviewEnded()
+                         // Execute the paste after preview
+                         self?.delegate?.directHotkeyPressed(for: index, isAutoPaste: true)
+                     }
+                 }
+            }
         default:
             break
         }
@@ -156,6 +179,8 @@ public class HotkeyManager {
     }
     
     deinit {
+        previewTimer?.invalidate()
+        previewTimer = nil
         unregisterHotkey()
     }
 }

@@ -133,6 +133,45 @@ final class HotkeyManagerTests: XCTestCase {
         XCTAssertTrue(mockDelegate.quitHotkeyPressedWasCalled, "Should call quit hotkey delegate")
         XCTAssertEqual(mockDelegate.quitHotkeyCallCount, 1, "Should call quit delegate once")
     }
+    
+    // MARK: - Preview Functionality Tests
+    
+    func testDirectHotkeyPreview() {
+        // Test preview functionality for index 2
+        mockDelegate.directHotkeyPreview(for: 2)
+        
+        XCTAssertEqual(mockDelegate.previewIndex, 2, "Should call preview delegate with correct index")
+        XCTAssertEqual(mockDelegate.previewCallCount, 1, "Should call preview delegate once")
+        XCTAssertTrue(mockDelegate.previewWasCalled, "Preview method should be called")
+    }
+    
+    func testDirectHotkeyPreviewMultipleIndices() {
+        // Test preview for all 6 indices
+        for index in 0..<6 {
+            mockDelegate.directHotkeyPreview(for: index)
+            XCTAssertEqual(mockDelegate.previewIndex, index, "Should call preview with index \(index)")
+        }
+        
+        XCTAssertEqual(mockDelegate.previewCallCount, 6, "Should call preview delegate 6 times")
+    }
+    
+    func testDirectHotkeyPreviewEnded() {
+        // Test preview ended functionality
+        mockDelegate.directHotkeyPreviewEnded()
+        
+        XCTAssertTrue(mockDelegate.previewEndedWasCalled, "Preview ended method should be called")
+        XCTAssertEqual(mockDelegate.previewEndedCallCount, 1, "Should call preview ended delegate once")
+    }
+    
+    func testPreviewWorkflow() {
+        // Test complete preview workflow
+        mockDelegate.directHotkeyPreview(for: 1)
+        XCTAssertTrue(mockDelegate.previewWasCalled, "Preview should start")
+        XCTAssertEqual(mockDelegate.previewIndex, 1, "Preview should be for index 1")
+        
+        mockDelegate.directHotkeyPreviewEnded()
+        XCTAssertTrue(mockDelegate.previewEndedWasCalled, "Preview should end")
+    }
 }
 
 // MARK: - Mock Delegate
@@ -149,6 +188,13 @@ class MockHotkeyManagerDelegate: HotkeyManagerDelegate {
     var isAutoPaste: Bool = false
     var hotkeyType: HotkeyType?
     
+    // Preview functionality
+    var previewWasCalled = false
+    var previewCallCount = 0
+    var previewIndex: Int = -1
+    var previewEndedWasCalled = false
+    var previewEndedCallCount = 0
+    
     func hotkeyPressed(type: HotkeyType) {
         hotkeyPressedWasCalled = true
         hotkeyPressedCallCount += 1
@@ -164,5 +210,16 @@ class MockHotkeyManagerDelegate: HotkeyManagerDelegate {
         directHotkeyIndex = index
         directHotkeyCallCount += 1
         self.isAutoPaste = isAutoPaste
+    }
+    
+    func directHotkeyPreview(for index: Int) {
+        previewWasCalled = true
+        previewCallCount += 1
+        previewIndex = index
+    }
+    
+    func directHotkeyPreviewEnded() {
+        previewEndedWasCalled = true
+        previewEndedCallCount += 1
     }
 } 
