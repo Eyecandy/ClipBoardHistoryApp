@@ -17,6 +17,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var fullTextContent: String?
     var settingsWindow: NSWindow?
     private var currentMode: PopupMode = .history
+    private var isHistoryCollapsed: Bool = false
+    private let maxMenuHistoryItems: Int = 10
     
     enum PopupMode {
         case history
@@ -449,20 +451,82 @@ agree to be bound by these terms and disclaimers.
             emptyItem.isEnabled = false
             menu.addItem(emptyItem)
         } else {
-            let historyHeaderItem = NSMenuItem(
-                title: "📋 Recent History",
-                action: nil,
-                keyEquivalent: ""
-            )
-            historyHeaderItem.isEnabled = false
-            menu.addItem(historyHeaderItem)
-            
-            for (index, item) in history.enumerated() {
-                addHistoryItemToMenu(menu, item: item, index: index)
-            }
+            addCollapsibleHistoryToMenu(menu, history: history)
         }
         
         menu.addItem(NSMenuItem.separator())
+    }
+    
+    private func addCollapsibleHistoryToMenu(_ menu: NSMenu, history: [String]) {
+        let chevron = isHistoryCollapsed ? "▶︎" : "▼"
+        let historyHeaderItem = NSMenuItem(
+            title: "\(chevron) Recent History (\(history.count))",
+            action: #selector(toggleHistoryCollapse),
+            keyEquivalent: ""
+        )
+        historyHeaderItem.target = self
+        menu.addItem(historyHeaderItem)
+        
+        if !isHistoryCollapsed {
+            // Show limited items with scrolling option
+            let visibleItems = Array(history.prefix(maxMenuHistoryItems))
+            
+            for (index, item) in visibleItems.enumerated() {
+                addHistoryItemToMenu(menu, item: item, index: index)
+            }
+            
+            // Add "More..." item if there are additional items
+            if history.count > maxMenuHistoryItems {
+                let moreItem = NSMenuItem(
+                    title: "... \(history.count - maxMenuHistoryItems) more items (hover to view)",
+                    action: nil,
+                    keyEquivalent: ""
+                )
+                moreItem.isEnabled = false
+                
+                // Create submenu for remaining items
+                let remainingSubmenu = NSMenu()
+                for (index, item) in history.dropFirst(maxMenuHistoryItems).enumerated() {
+                    let adjustedIndex = index + maxMenuHistoryItems
+                    addScrollableHistoryItemToMenu(remainingSubmenu, item: item, index: adjustedIndex)
+                }
+                moreItem.submenu = remainingSubmenu
+                menu.addItem(moreItem)
+            }
+        }
+    }
+    
+    @objc private func toggleHistoryCollapse() {
+        isHistoryCollapsed.toggle()
+        updateMenu()
+    }
+    
+    private func addScrollableHistoryItemToMenu(_ menu: NSMenu, item: String, index: Int) {
+        // Simplified menu item for scrollable section (no submenu)
+        let cleanedText = item.cleanedForDisplay().truncated(to: 40)
+        let currentClipboard = clipboardManager?.getCurrentClipboardItem()
+        let isCurrentItem = (item == currentClipboard)
+        
+        let menuTitle: NSAttributedString
+        if isCurrentItem {
+            let fullText = "● \(index + 1). \(cleanedText)"
+            let attributedString = NSMutableAttributedString(string: fullText)
+            let mintGreen = NSColor(red: 0.0, green: 0.784, blue: 0.588, alpha: 1.0)
+            attributedString.addAttribute(.foregroundColor, value: mintGreen, range: NSRange(location: 0, length: 1))
+            menuTitle = attributedString
+        } else {
+            menuTitle = NSAttributedString(string: "\(index + 1). \(cleanedText)")
+        }
+        
+        let menuItem = NSMenuItem(
+            title: "",
+            action: #selector(selectClipboardItem(_:)),
+            keyEquivalent: ""
+        )
+        menuItem.attributedTitle = menuTitle
+        menuItem.tag = index
+        menuItem.target = self
+        menu.addItem(menuItem)
     }
     
     private func addHistoryItemToMenu(_ menu: NSMenu, item: String, index: Int) {
@@ -470,16 +534,26 @@ agree to be bound by these terms and disclaimers.
         let cleanedText = item.cleanedForDisplay().truncated(to: 45)
         let currentClipboard = clipboardManager?.getCurrentClipboardItem()
         let isCurrentItem = (item == currentClipboard)
-        let prefix = isCurrentItem ? "🟢 " : ""
-        let menuTitle = "\(prefix)\(index + 1). \(cleanedText)"
+        
+        let menuTitle: NSAttributedString
+        if isCurrentItem {
+            let fullText = "● \(index + 1). \(cleanedText)"
+            let attributedString = NSMutableAttributedString(string: fullText)
+            let mintGreen = NSColor(red: 0.0, green: 0.784, blue: 0.588, alpha: 1.0)
+            attributedString.addAttribute(.foregroundColor, value: mintGreen, range: NSRange(location: 0, length: 1))
+            menuTitle = attributedString
+        } else {
+            menuTitle = NSAttributedString(string: "\(index + 1). \(cleanedText)")
+        }
         
         // Add keyboard shortcut for first 6 items
         let keyEquivalent = (index < 6) ? "\(index + 1)" : ""
         let menuItem = NSMenuItem(
-            title: menuTitle,
+            title: "",
             action: #selector(selectClipboardItem(_:)),
             keyEquivalent: keyEquivalent
         )
+        menuItem.attributedTitle = menuTitle
         if index < 6 {
             menuItem.keyEquivalentModifierMask = [.command, .option]
         }
@@ -543,14 +617,24 @@ agree to be bound by these terms and disclaimers.
         let cleanedText = item.cleanedForDisplay().truncated(to: 45)
         let currentClipboard = clipboardManager?.getCurrentClipboardItem()
         let isCurrentItem = (item == currentClipboard)
-        let prefix = isCurrentItem ? "🟢 " : ""
-        let menuTitle = "\(prefix)📌 \(cleanedText)"
+        
+        let menuTitle: NSAttributedString
+        if isCurrentItem {
+            let fullText = "● 📌 \(cleanedText)"
+            let attributedString = NSMutableAttributedString(string: fullText)
+            let mintGreen = NSColor(red: 0.0, green: 0.784, blue: 0.588, alpha: 1.0)
+            attributedString.addAttribute(.foregroundColor, value: mintGreen, range: NSRange(location: 0, length: 1))
+            menuTitle = attributedString
+        } else {
+            menuTitle = NSAttributedString(string: "📌 \(cleanedText)")
+        }
         
         let menuItem = NSMenuItem(
-            title: menuTitle,
+            title: "",
             action: #selector(selectPinnedItem(_:)),
             keyEquivalent: ""
         )
+        menuItem.attributedTitle = menuTitle
         menuItem.tag = index
         menuItem.target = self
         

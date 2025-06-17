@@ -564,17 +564,9 @@ public class ClipboardPopup: NSObject {
     private func styleContainerView(_ containerView: ClipboardItemView, isCurrentItem: Bool) {
         // Add background for better visibility
         containerView.wantsLayer = true
-        
-        if isCurrentItem {
-            // Highlight current clipboard item with blue background
-            containerView.layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.2).cgColor
-            containerView.layer?.borderColor = NSColor.systemBlue.cgColor
-            containerView.layer?.borderWidth = 1.5
-        } else {
-            containerView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-            containerView.layer?.borderColor = NSColor.separatorColor.cgColor
-            containerView.layer?.borderWidth = 0.5
-        }
+        containerView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        containerView.layer?.borderColor = NSColor.separatorColor.cgColor
+        containerView.layer?.borderWidth = 0.5
     }
     
     private func addLabelsToContainer(_ containerView: ClipboardItemView, item: String, frame: NSRect) {
@@ -600,6 +592,18 @@ public class ClipboardPopup: NSObject {
         label.backgroundColor = NSColor.clear
         label.isBordered = false
         containerView.addSubview(label)
+        
+        // Add current clipboard indicator if this item is current
+        if containerView.isCurrentClipboardItem {
+            let currentIndicator = NSTextField(labelWithString: "●")
+            currentIndicator.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+            currentIndicator.textColor = NSColor(red: 0.0, green: 0.784, blue: 0.588, alpha: 1.0) // Mint green #00C896
+            currentIndicator.frame = NSRect(x: frame.width - 25, y: 25, width: 15, height: 20)
+            currentIndicator.alignment = .center
+            currentIndicator.backgroundColor = NSColor.clear
+            currentIndicator.isBordered = false
+            containerView.addSubview(currentIndicator)
+        }
         
         // Add click instruction with dynamic hotkey info
         let instructionText = containerView.index < 6 ? 
